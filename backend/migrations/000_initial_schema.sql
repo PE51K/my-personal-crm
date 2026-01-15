@@ -141,14 +141,9 @@ CREATE TRIGGER update_contacts_updated_at
 -- =============================================================================
 -- DEFAULT STATUS SEED DATA
 -- =============================================================================
-
-INSERT INTO statuses (name, sort_order, is_active)
-VALUES
-    ('New', 1, TRUE),
-    ('Active', 2, TRUE),
-    ('Inactive', 3, TRUE),
-    ('Archived', 4, TRUE)
-ON CONFLICT DO NOTHING;
+-- NOTE: Statuses are seeded during bootstrap in app/services/auth.py
+-- This prevents duplication when migrations run before bootstrap.
+-- DO NOT insert statuses here!
 
 -- =============================================================================
 -- VERIFICATION QUERIES
