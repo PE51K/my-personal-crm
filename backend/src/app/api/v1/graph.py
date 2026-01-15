@@ -1,0 +1,177 @@
+"""Graph API endpoints."""
+
+from fastapi import APIRouter, status
+
+from app.core.deps import CurrentOwner, SupabaseClient
+from app.schemas.graph import (
+    ClusterRecomputeResponse,
+    EdgeCreateRequest,
+    EdgeResponse,
+    GraphResponse,
+)
+from app.services.graph import (
+    create_edge,
+    delete_edge,
+    get_graph,
+    recompute_clusters,
+)
+
+router = APIRouter(prefix="/graph", tags=["Graph"])
+
+
+@router.get(
+    "",
+    response_model=GraphResponse,
+    summary="Get graph",
+    description="Get all contacts and associations for graph visualization.",
+)
+async def get_graph_endpoint(
+    current_user: CurrentOwner,
+    supabase: SupabaseClient,
+) -> GraphResponse:
+    """Get all contacts and associations for graph visualization.
+
+    Returns all contacts as nodes and associations as edges,
+    along with cluster information for grouping.
+
+    Args:
+        current_user: Current authenticated owner.
+        supabase: Supabase client instance.
+
+    Returns:
+        Graph with nodes, edges, and clusters.
+    """
+    return get_graph(supabase)
+
+
+@router.post(
+    "/edge",
+    response_model=EdgeResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create edge",
+    description="Create an association between two contacts.",
+    responses={
+        404: {
+            "description": "Contact not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": {
+                            "code": "CONTACT_NOT_FOUND",
+                            "message": "Contact with the specified ID was not found",
+                        }
+                    }
+                }
+            },
+        },
+        409: {
+            "description": "Edge already exists",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": {
+                            "code": "GRAPH_EDGE_EXISTS",
+                            "message": "An association between these contacts already exists",
+                        }
+                    }
+                }
+            },
+        },
+    },
+)
+async def create_edge_endpoint(
+    request: EdgeCreateRequest,
+    current_user: CurrentOwner,
+    supabase: SupabaseClient,
+) -> EdgeResponse:
+    """Create an association between two contacts.
+
+    Creates a bidirectional association between two contacts.
+    The edge can have an optional label to describe the relationship.
+
+    Args:
+        request: Edge creation request.
+        current_user: Current authenticated owner.
+        supabase: Supabase client instance.
+
+    Returns:
+        Created edge.
+
+    Raises:
+        ContactNotFoundError: If either contact doesn't exist.
+        GraphEdgeExistsError: If edge already exists.
+    """
+    return create_edge(
+        supabase=supabase,
+        source_id=request.source_id,
+        target_id=request.target_id,
+        label=request.label,
+    )
+
+
+@router.delete(
+    "/edge/{edge_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete edge",
+    description="Delete an association.",
+    responses={
+        404: {
+            "description": "Edge not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": {
+                            "code": "GRAPH_EDGE_NOT_FOUND",
+                            "message": "Edge with the specified ID was not found",
+                        }
+                    }
+                }
+            },
+        }
+    },
+)
+async def delete_edge_endpoint(
+    edge_id: str,
+    current_user: CurrentOwner,
+    supabase: SupabaseClient,
+) -> None:
+    """Delete an association.
+
+    Removes the association between two contacts. This action
+    cannot be undone.
+
+    Args:
+        edge_id: Edge ID to delete.
+        current_user: Current authenticated owner.
+        supabase: Supabase client instance.
+
+    Raises:
+        GraphEdgeNotFoundError: If edge doesn't exist.
+    """
+    delete_edge(supabase, edge_id)
+
+
+@router.post(
+    "/clusters/recompute",
+    response_model=ClusterRecomputeResponse,
+    summary="Recompute clusters",
+    description="Recompute clusters using connected components algorithm.",
+)
+async def recompute_clusters_endpoint(
+    current_user: CurrentOwner,
+    supabase: SupabaseClient,
+) -> ClusterRecomputeResponse:
+    """Recompute clusters using connected components algorithm.
+
+    Analyzes the association graph and assigns cluster IDs to
+    contacts based on connectivity. Contacts in the same connected
+    component will have the same cluster_id.
+
+    Args:
+        current_user: Current authenticated owner.
+        supabase: Supabase client instance.
+
+    Returns:
+        Cluster recomputation statistics.
+    """
+    return recompute_clusters(supabase)

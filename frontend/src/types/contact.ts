@@ -1,0 +1,170 @@
+/**
+ * Base tag
+ */
+export interface Tag {
+  id: string;
+  name: string;
+}
+
+/**
+ * Tag with usage count
+ */
+export interface TagWithCount extends Tag {
+  usage_count: number;
+}
+
+/**
+ * Base interest
+ */
+export interface Interest {
+  id: string;
+  name: string;
+}
+
+/**
+ * Base occupation
+ */
+export interface Occupation {
+  id: string;
+  name: string;
+}
+
+/**
+ * Base status
+ */
+export interface Status {
+  id: string;
+  name: string;
+}
+
+/**
+ * Status with full details
+ */
+export interface StatusFull extends Status {
+  sort_order: number;
+  is_active: boolean;
+  contact_count: number;
+}
+
+/**
+ * Brief contact info for associations
+ */
+export interface ContactAssociationBrief {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+}
+
+/**
+ * Contact creation request
+ */
+export interface ContactCreateRequest {
+  first_name: string;
+  middle_name?: string | null;
+  last_name?: string | null;
+  telegram_username?: string | null;
+  linkedin_url?: string | null;
+  github_username?: string | null;
+  met_at?: string | null; // ISO date string
+  status_id?: string | null;
+  notes?: string | null;
+  tag_ids?: string[];
+  interest_ids?: string[];
+  occupation_ids?: string[];
+  association_contact_ids?: string[];
+}
+
+/**
+ * Contact update request (partial)
+ */
+export interface ContactUpdateRequest {
+  first_name?: string;
+  middle_name?: string | null;
+  last_name?: string | null;
+  telegram_username?: string | null;
+  linkedin_url?: string | null;
+  github_username?: string | null;
+  met_at?: string | null;
+  status_id?: string | null;
+  notes?: string | null;
+  tag_ids?: string[];
+  interest_ids?: string[];
+  occupation_ids?: string[];
+  association_contact_ids?: string[];
+}
+
+/**
+ * Full contact response
+ */
+export interface Contact {
+  id: string;
+  first_name: string;
+  middle_name: string | null;
+  last_name: string | null;
+  telegram_username: string | null;
+  linkedin_url: string | null;
+  github_username: string | null;
+  met_at: string | null;
+  status_id: string | null;
+  status: Status | null;
+  notes: string | null;
+  photo_path: string | null;
+  photo_url: string | null;
+  tags: Tag[];
+  interests: Interest[];
+  occupations: Occupation[];
+  associations: ContactAssociationBrief[];
+  cluster_id: number | null;
+  sort_order_in_status: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Contact list item (abbreviated)
+ */
+export interface ContactListItem {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  status: Status | null;
+  photo_url: string | null;
+  tags: Tag[];
+  created_at: string;
+}
+
+/**
+ * Photo upload response
+ */
+export interface PhotoUploadResponse {
+  photo_path: string;
+  photo_url: string;
+}
+
+/**
+ * Photo URL response
+ */
+export interface PhotoUrlResponse {
+  photo_url: string;
+  expires_at: string;
+}
+
+/**
+ * Contact list query parameters
+ */
+export interface ContactListParams {
+  page?: number;
+  page_size?: number;
+  status_id?: string;
+  tag_ids?: string[];
+  interest_ids?: string[];
+  occupation_ids?: string[];
+  created_at_from?: string;
+  created_at_to?: string;
+  met_at_from?: string;
+  met_at_to?: string;
+  cluster_id?: number;
+  search?: string;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+}

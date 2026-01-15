@@ -1,0 +1,361 @@
+/**
+ * Contact form component for create/edit
+ */
+
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { Autocomplete } from '@/components/ui/Autocomplete';
+import { PhotoUpload } from './PhotoUpload';
+import { useStatuses } from '@/hooks/useStatuses';
+import {
+  useTagSuggestions,
+  useInterestSuggestions,
+  useOccupationSuggestions,
+} from '@/hooks/useSuggestions';
+import type {
+  Contact,
+  ContactCreateRequest,
+  ContactUpdateRequest,
+  Tag,
+  Interest,
+  Occupation,
+} from '@/types';
+
+interface ContactFormProps {
+  initialData?: Contact | null;
+  onSubmit: (data: ContactCreateRequest | ContactUpdateRequest) => Promise<void>;
+  onCancel?: () => void;
+  onPhotoUpload?: (file: File) => void;
+  isSubmitting?: boolean;
+  isUploadingPhoto?: boolean;
+  submitLabel?: string;
+}
+
+interface FormData {
+  first_name: string;
+  middle_name: string;
+  last_name: string;
+  telegram_username: string;
+  linkedin_url: string;
+  github_username: string;
+  met_at: string;
+  status_id: string;
+  notes: string;
+}
+
+interface FormErrors {
+  first_name?: string;
+  linkedin_url?: string;
+  general?: string;
+}
+
+export function ContactForm({
+  initialData,
+  onSubmit,
+  onCancel,
+  onPhotoUpload,
+  isSubmitting = false,
+  isUploadingPhoto = false,
+  submitLabel = 'Save Contact',
+}: ContactFormProps): ReactNode {
+  const { data: statusesResponse } = useStatuses();
+  const statuses = statusesResponse?.data ?? [];
+
+  // Form state
+  const [formData, setFormData] = useState<FormData>({
+    first_name: initialData?.first_name ?? '',
+    middle_name: initialData?.middle_name ?? '',
+    last_name: initialData?.last_name ?? '',
+    telegram_username: initialData?.telegram_username ?? '',
+    linkedin_url: initialData?.linkedin_url ?? '',
+    github_username: initialData?.github_username ?? '',
+    met_at: initialData?.met_at ?? '',
+    status_id: initialData?.status_id ?? '',
+    notes: initialData?.notes ?? '',
+  });
+  const [errors, setErrors] = useState<FormErrors>({});
+
+  // Selected items for autocomplete fields
+  const [selectedTags, setSelectedTags] = useState<Tag[]>(initialData?.tags ?? []);
+  const [selectedInterests, setSelectedInterests] = useState<Interest[]>(
+    initialData?.interests ?? []
+  );
+  const [selectedOccupations, setSelectedOccupations] = useState<Occupation[]>(
+    initialData?.occupations ?? []
+  );
+
+  // Autocomplete queries
+  const [tagQuery, setTagQuery] = useState('');
+  const [interestQuery, setInterestQuery] = useState('');
+  const [occupationQuery, setOccupationQuery] = useState('');
+
+  // Fetch suggestions
+  const { data: tagSuggestions, isLoading: loadingTags } = useTagSuggestions(tagQuery);
+  const { data: interestSuggestions, isLoading: loadingInterests } =
+    useInterestSuggestions(interestQuery);
+  const { data: occupationSuggestions, isLoading: loadingOccupations } =
+    useOccupationSuggestions(occupationQuery);
+
+  // Update form data when initialData changes
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        first_name: initialData.first_name,
+        middle_name: initialData.middle_name ?? '',
+        last_name: initialData.last_name ?? '',
+        telegram_username: initialData.telegram_username ?? '',
+        linkedin_url: initialData.linkedin_url ?? '',
+        github_username: initialData.github_username ?? '',
+        met_at: initialData.met_at ?? '',
+        status_id: initialData.status_id ?? '',
+        notes: initialData.notes ?? '',
+      });
+      setSelectedTags(initialData.tags);
+      setSelectedInterests(initialData.interests);
+      setSelectedOccupations(initialData.occupations);
+    }
+  }, [initialData]);
+
+  const validateForm = useCallback((): boolean => {
+    const newErrors: FormErrors = {};
+
+    if (!formData.first_name.trim()) {
+      newErrors.first_name = 'First name is required';
+    }
+
+    if (formData.linkedin_url) {
+      try {
+        new URL(formData.linkedin_url);
+      } catch {
+        newErrors.linkedin_url = 'Please enter a valid URL';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [formData]);
+
+  const handleSubmit = useCallback(
+    async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+      e.preventDefault();
+
+      if (!validateForm()) {
+        return;
+      }
+
+      const data: ContactCreateRequest | ContactUpdateRequest = {
+        first_name: formData.first_name.trim(),
+        middle_name: formData.middle_name.trim() || null,
+        last_name: formData.last_name.trim() || null,
+        telegram_username: formData.telegram_username.trim() || null,
+        linkedin_url: formData.linkedin_url.trim() || null,
+        github_username: formData.github_username.trim() || null,
+        met_at: formData.met_at || null,
+        status_id: formData.status_id || null,
+        notes: formData.notes.trim() || null,
+        tag_ids: selectedTags.map((t) => t.id),
+        interest_ids: selectedInterests.map((i) => i.id),
+        occupation_ids: selectedOccupations.map((o) => o.id),
+      };
+
+      await onSubmit(data);
+    },
+    [formData, selectedTags, selectedInterests, selectedOccupations, onSubmit, validateForm]
+  );
+
+  const handleInputChange = useCallback(
+    (field: keyof FormData) =>
+      (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+        if (errors[field as keyof FormErrors]) {
+          setErrors((prev) => ({ ...prev, [field]: undefined }));
+        }
+      },
+    [errors]
+  );
+
+  // Create new items (for tags, interests, occupations that don't exist)
+  const handleCreateTag = useCallback((name: string): void => {
+    // Create a temporary ID - server will assign real ID
+    const newTag: Tag = { id: `temp-${Date.now()}`, name };
+    setSelectedTags((prev) => [...prev, newTag]);
+  }, []);
+
+  const handleCreateInterest = useCallback((name: string): void => {
+    const newInterest: Interest = { id: `temp-${Date.now()}`, name };
+    setSelectedInterests((prev) => [...prev, newInterest]);
+  }, []);
+
+  const handleCreateOccupation = useCallback((name: string): void => {
+    const newOccupation: Occupation = { id: `temp-${Date.now()}`, name };
+    setSelectedOccupations((prev) => [...prev, newOccupation]);
+  }, []);
+
+  const statusOptions = statuses.map((s) => ({ value: s.id, label: s.name }));
+
+  return (
+    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6">
+      {errors.general && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+          {errors.general}
+        </div>
+      )}
+
+      {/* Photo upload */}
+      {onPhotoUpload && (
+        <div className="flex justify-center pb-4 border-b border-gray-200">
+          <PhotoUpload
+            currentPhotoUrl={initialData?.photo_url}
+            name={`${formData.first_name} ${formData.last_name}`}
+            onUpload={onPhotoUpload}
+            isUploading={isUploadingPhoto}
+          />
+        </div>
+      )}
+
+      {/* Basic info */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Input
+          label="First Name"
+          value={formData.first_name}
+          onChange={handleInputChange('first_name')}
+          error={errors.first_name}
+          required
+        />
+        <Input
+          label="Middle Name"
+          value={formData.middle_name}
+          onChange={handleInputChange('middle_name')}
+        />
+        <Input
+          label="Last Name"
+          value={formData.last_name}
+          onChange={handleInputChange('last_name')}
+        />
+      </div>
+
+      {/* Social links */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Input
+          label="Telegram Username"
+          value={formData.telegram_username}
+          onChange={handleInputChange('telegram_username')}
+          placeholder="@username"
+        />
+        <Input
+          label="LinkedIn URL"
+          type="url"
+          value={formData.linkedin_url}
+          onChange={handleInputChange('linkedin_url')}
+          error={errors.linkedin_url}
+          placeholder="https://linkedin.com/in/..."
+        />
+        <Input
+          label="GitHub Username"
+          value={formData.github_username}
+          onChange={handleInputChange('github_username')}
+          placeholder="username"
+        />
+      </div>
+
+      {/* Status and date */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Select
+          label="Status"
+          value={formData.status_id}
+          onChange={handleInputChange('status_id')}
+          options={statusOptions}
+          placeholder="Select a status"
+        />
+        <Input
+          label="Met At"
+          type="date"
+          value={formData.met_at}
+          onChange={handleInputChange('met_at')}
+        />
+      </div>
+
+      {/* Tags, Interests, Occupations */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Autocomplete
+          label="Tags"
+          placeholder="Add tags..."
+          query={tagQuery}
+          onQueryChange={setTagQuery}
+          suggestions={tagSuggestions?.data ?? []}
+          selectedItems={selectedTags}
+          onSelect={(item) => {
+            setSelectedTags((prev) => [...prev, item as Tag]);
+          }}
+          onRemove={(item) => {
+            setSelectedTags((prev) => prev.filter((t) => t.id !== item.id));
+          }}
+          onCreate={handleCreateTag}
+          isLoading={loadingTags}
+        />
+        <Autocomplete
+          label="Interests"
+          placeholder="Add interests..."
+          query={interestQuery}
+          onQueryChange={setInterestQuery}
+          suggestions={interestSuggestions?.data ?? []}
+          selectedItems={selectedInterests}
+          onSelect={(item) => {
+            setSelectedInterests((prev) => [...prev, item as Interest]);
+          }}
+          onRemove={(item) => {
+            setSelectedInterests((prev) => prev.filter((i) => i.id !== item.id));
+          }}
+          onCreate={handleCreateInterest}
+          isLoading={loadingInterests}
+        />
+        <Autocomplete
+          label="Occupations"
+          placeholder="Add occupations..."
+          query={occupationQuery}
+          onQueryChange={setOccupationQuery}
+          suggestions={occupationSuggestions?.data ?? []}
+          selectedItems={selectedOccupations}
+          onSelect={(item) => {
+            setSelectedOccupations((prev) => [...prev, item as Occupation]);
+          }}
+          onRemove={(item) => {
+            setSelectedOccupations((prev) => prev.filter((o) => o.id !== item.id));
+          }}
+          onCreate={handleCreateOccupation}
+          isLoading={loadingOccupations}
+        />
+      </div>
+
+      {/* Notes */}
+      <Textarea
+        label="Notes"
+        value={formData.notes}
+        onChange={handleInputChange('notes')}
+        rows={4}
+        placeholder="Add any notes about this contact..."
+      />
+
+      {/* Actions */}
+      <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+        {onCancel && (
+          <Button type="button" variant="secondary" onClick={onCancel}>
+            Cancel
+          </Button>
+        )}
+        <Button type="submit" isLoading={isSubmitting}>
+          {submitLabel}
+        </Button>
+      </div>
+    </form>
+  );
+}

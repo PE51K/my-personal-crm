@@ -1,0 +1,36 @@
+# =============================================================================
+# Frontend Service - React + Vite served by Nginx
+# =============================================================================
+# This compose file defines the web service for the Personal CRM frontend.
+# It uses a multi-stage build to compile React assets and serve them via Nginx.
+# Nginx also proxies /api requests to the backend service.
+# =============================================================================
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Pass Vite environment variables at build time
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
+    container_name: personal-crm-web
+    ports:
+      - "3000:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - crm-network
+
+networks:
+  crm-network:
+    name: personal-crm-network
+    external: true

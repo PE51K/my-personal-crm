@@ -1,0 +1,48 @@
+# =============================================================================
+# Backend Service - FastAPI with uvicorn
+# =============================================================================
+# This compose file defines the API service for the Personal CRM backend.
+# It uses Python 3.12 with uv for dependency management.
+# =============================================================================
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: personal-crm-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount source code for hot reload during development
+      - ./src:/app/src:ro
+    environment:
+      # Supabase Configuration
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_STORAGE_BUCKET=${SUPABASE_STORAGE_BUCKET:-contact-photos}
+      # Application Configuration
+      - APP_ENV=${APP_ENV:-development}
+      - APP_DEBUG=${APP_DEBUG:-true}
+      - APP_LOG_LEVEL=${APP_LOG_LEVEL:-INFO}
+      # Security
+      - CORS_ORIGINS=${CORS_ORIGINS:-["http://localhost:3000"]}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      # Server
+      - HOST=${HOST:-0.0.0.0}
+      - PORT=${PORT:-8000}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - crm-network
+
+networks:
+  crm-network:
+    name: personal-crm-network
+    driver: bridge
