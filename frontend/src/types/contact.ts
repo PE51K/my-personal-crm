@@ -56,6 +56,24 @@ export interface ContactAssociationBrief {
 }
 
 /**
+ * Input for tag/interest/occupation (supports temp IDs)
+ */
+export interface TagInput {
+  id: string;
+  name: string;
+}
+
+export interface InterestInput {
+  id: string;
+  name: string;
+}
+
+export interface OccupationInput {
+  id: string;
+  name: string;
+}
+
+/**
  * Contact creation request
  */
 export interface ContactCreateRequest {
@@ -68,9 +86,9 @@ export interface ContactCreateRequest {
   met_at?: string | null; // ISO date string
   status_id?: string | null;
   notes?: string | null;
-  tag_ids?: string[];
-  interest_ids?: string[];
-  occupation_ids?: string[];
+  tag_ids?: (string | TagInput)[];
+  interest_ids?: (string | InterestInput)[];
+  occupation_ids?: (string | OccupationInput)[];
   association_contact_ids?: string[];
 }
 
@@ -87,9 +105,9 @@ export interface ContactUpdateRequest {
   met_at?: string | null;
   status_id?: string | null;
   notes?: string | null;
-  tag_ids?: string[];
-  interest_ids?: string[];
-  occupation_ids?: string[];
+  tag_ids?: (string | TagInput)[];
+  interest_ids?: (string | InterestInput)[];
+  occupation_ids?: (string | OccupationInput)[];
   association_contact_ids?: string[];
 }
 

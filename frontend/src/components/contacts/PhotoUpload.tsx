@@ -9,9 +9,10 @@ import { Button } from '@/components/ui/Button';
 interface PhotoUploadProps {
   currentPhotoUrl?: string | null | undefined;
   name?: string;
-  onUpload: (file: File) => void;
+  onUpload?: ((file: File) => void) | undefined;
   isUploading?: boolean;
   error?: string;
+  disabled?: boolean;
 }
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -24,6 +25,7 @@ export function PhotoUpload({
   onUpload,
   isUploading = false,
   error,
+  disabled = false,
 }: PhotoUploadProps): ReactNode {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -32,7 +34,7 @@ export function PhotoUpload({
   const handleFileChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>): void => {
       const file = e.target.files?.[0];
-      if (!file) return;
+      if (!file || !onUpload) return;
 
       // Validate file type
       if (!ALLOWED_TYPES.includes(file.type)) {
@@ -81,15 +83,19 @@ export function PhotoUpload({
         className="hidden"
       />
 
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        onClick={handleButtonClick}
-        isLoading={isUploading}
-      >
-        {currentPhotoUrl ?? previewUrl ? 'Change Photo' : 'Upload Photo'}
-      </Button>
+      {onUpload && !disabled ? (
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={handleButtonClick}
+          isLoading={isUploading}
+        >
+          {currentPhotoUrl ?? previewUrl ? 'Change Photo' : 'Upload Photo'}
+        </Button>
+      ) : (
+        <p className="text-xs text-gray-500">Photo can be added after saving</p>
+      )}
 
       {displayError && (
         <p className="text-sm text-red-600" role="alert">

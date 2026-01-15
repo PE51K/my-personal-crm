@@ -2,12 +2,14 @@
  * Suggestions hooks with TanStack Query for autocomplete
  */
 
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   getInterestSuggestions,
   getOccupationSuggestions,
   getTagSuggestions,
 } from '@/services/suggestions';
+import { useStatuses } from './useStatuses';
 
 /**
  * Query key factory for suggestions
@@ -53,4 +55,27 @@ export function useOccupationSuggestions(query: string, limit = 10) {
     enabled: query.length >= 1,
     staleTime: 30 * 1000,
   });
+}
+
+/**
+ * Hook to get filtered status suggestions (client-side filtering)
+ */
+export function useStatusSuggestions(query: string) {
+  const { data: statusesResponse, isLoading } = useStatuses();
+  const statuses = statusesResponse?.data ?? [];
+
+  const filteredStatuses = useMemo(() => {
+    if (!query.trim()) {
+      return statuses.map((s) => ({ id: s.id, name: s.name }));
+    }
+    const lowerQuery = query.toLowerCase();
+    return statuses
+      .filter((s) => s.name.toLowerCase().includes(lowerQuery))
+      .map((s) => ({ id: s.id, name: s.name }));
+  }, [statuses, query]);
+
+  return {
+    data: filteredStatuses,
+    isLoading,
+  };
 }

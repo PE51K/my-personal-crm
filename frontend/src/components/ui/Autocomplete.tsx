@@ -33,6 +33,8 @@ interface AutocompleteProps {
   isLoading?: boolean;
   allowCreate?: boolean;
   query: string;
+  /** Single select mode - only one item can be selected at a time */
+  singleSelect?: boolean;
 }
 
 export function Autocomplete({
@@ -49,6 +51,7 @@ export function Autocomplete({
   isLoading = false,
   allowCreate = true,
   query,
+  singleSelect = false,
 }: AutocompleteProps): ReactNode {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -179,8 +182,8 @@ export function Autocomplete({
         </label>
       )}
 
-      {/* Selected items */}
-      {selectedItems.length > 0 && (
+      {/* Selected items - multi-select mode */}
+      {!singleSelect && selectedItems.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2">
           {selectedItems.map((item) => (
             <Badge
@@ -197,17 +200,43 @@ export function Autocomplete({
 
       {/* Input */}
       <div className="relative">
-        <Input
-          ref={inputRef}
-          value={query}
-          onChange={(e) => { handleInputChange(e.target.value); }}
-          onFocus={() => { setIsOpen(true); }}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          error={error}
-          helperText={helperText}
-          rightIcon={isLoading ? <Spinner size="sm" /> : undefined}
-        />
+        {singleSelect && selectedItems.length > 0 && !isOpen ? (
+          <div
+            className="flex items-center justify-between w-full px-3 py-2 border border-gray-300 rounded-md bg-white cursor-pointer hover:border-gray-400"
+            onClick={() => {
+              setIsOpen(true);
+              inputRef.current?.focus();
+            }}
+          >
+            <span className="text-sm text-gray-900">{selectedItems[0]?.name}</span>
+            <button
+              type="button"
+              className="ml-2 text-gray-400 hover:text-gray-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (selectedItems[0]) {
+                  onRemove(selectedItems[0]);
+                }
+              }}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <Input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => { handleInputChange(e.target.value); }}
+            onFocus={() => { setIsOpen(true); }}
+            onKeyDown={handleKeyDown}
+            placeholder={singleSelect && selectedItems.length > 0 ? selectedItems[0]?.name : placeholder}
+            error={error}
+            helperText={helperText}
+            rightIcon={isLoading ? <Spinner size="sm" /> : undefined}
+          />
+        )}
       </div>
 
       {/* Dropdown */}

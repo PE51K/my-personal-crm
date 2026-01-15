@@ -14,14 +14,144 @@ from app.schemas.contact import (
     ContactListResponse,
     ContactResponse,
     InterestBase,
+    InterestInput,
     OccupationBase,
+    OccupationInput,
     PaginationMeta,
     StatusBase,
     TagBase,
+    TagInput,
 )
 from app.services.supabase import get_signed_photo_url
 
 logger = logging.getLogger(__name__)
+
+
+def _is_temp_id(id_str: str) -> bool:
+    """Check if an ID is a temporary ID."""
+    return id_str.startswith("temp-")
+
+
+def _process_tags(
+    supabase: Client,
+    tag_inputs: list[str | TagInput] | None,
+) -> list[str]:
+    """Process tag inputs and return list of valid tag IDs.
+
+    Creates new tags for temp IDs and returns real UUIDs.
+
+    Args:
+        supabase: Supabase client instance.
+        tag_inputs: List of tag IDs or tag input objects.
+
+    Returns:
+        List of valid tag UUIDs.
+    """
+    if not tag_inputs:
+        return []
+
+    tag_ids = []
+    for tag_input in tag_inputs:
+        if isinstance(tag_input, str):
+            # String ID - check if temp or real
+            if _is_temp_id(tag_input):
+                logger.warning("Received temp tag ID without name: %s", tag_input)
+                continue
+            tag_ids.append(tag_input)
+        else:
+            # TagInput object
+            if _is_temp_id(tag_input.id):
+                # Create new tag
+                result = supabase.table("tags").insert({"name": tag_input.name}).execute()
+                if result.data:
+                    tag_ids.append(result.data[0]["id"])
+            else:
+                # Use existing tag ID
+                tag_ids.append(tag_input.id)
+
+    return tag_ids
+
+
+def _process_interests(
+    supabase: Client,
+    interest_inputs: list[str | InterestInput] | None,
+) -> list[str]:
+    """Process interest inputs and return list of valid interest IDs.
+
+    Creates new interests for temp IDs and returns real UUIDs.
+
+    Args:
+        supabase: Supabase client instance.
+        interest_inputs: List of interest IDs or interest input objects.
+
+    Returns:
+        List of valid interest UUIDs.
+    """
+    if not interest_inputs:
+        return []
+
+    interest_ids = []
+    for interest_input in interest_inputs:
+        if isinstance(interest_input, str):
+            # String ID - check if temp or real
+            if _is_temp_id(interest_input):
+                logger.warning("Received temp interest ID without name: %s", interest_input)
+                continue
+            interest_ids.append(interest_input)
+        else:
+            # InterestInput object
+            if _is_temp_id(interest_input.id):
+                # Create new interest
+                result = supabase.table("interests").insert({"name": interest_input.name}).execute()
+                if result.data:
+                    interest_ids.append(result.data[0]["id"])
+            else:
+                # Use existing interest ID
+                interest_ids.append(interest_input.id)
+
+    return interest_ids
+
+
+def _process_occupations(
+    supabase: Client,
+    occupation_inputs: list[str | OccupationInput] | None,
+) -> list[str]:
+    """Process occupation inputs and return list of valid occupation IDs.
+
+    Creates new occupations for temp IDs and returns real UUIDs.
+
+    Args:
+        supabase: Supabase client instance.
+        occupation_inputs: List of occupation IDs or occupation input objects.
+
+    Returns:
+        List of valid occupation UUIDs.
+    """
+    if not occupation_inputs:
+        return []
+
+    occupation_ids = []
+    for occupation_input in occupation_inputs:
+        if isinstance(occupation_input, str):
+            # String ID - check if temp or real
+            if _is_temp_id(occupation_input):
+                logger.warning("Received temp occupation ID without name: %s", occupation_input)
+                continue
+            occupation_ids.append(occupation_input)
+        else:
+            # OccupationInput object
+            if _is_temp_id(occupation_input.id):
+                # Create new occupation
+                result = (
+                    supabase.table("occupations").insert({"name": occupation_input.name}).execute()
+                )
+                if result.data:
+                    occupation_ids.append(result.data[0]["id"])
+            else:
+                # Use existing occupation ID
+                occupation_ids.append(occupation_input.id)
+
+    return occupation_ids
 
 
 def _build_contact_response(
@@ -160,9 +290,9 @@ def create_contact(
     met_at: date | None = None,
     status_id: str | None = None,
     notes: str | None = None,
-    tag_ids: list[str] | None = None,
-    interest_ids: list[str] | None = None,
-    occupation_ids: list[str] | None = None,
+    tag_ids: list[str | TagInput] | None = None,
+    interest_ids: list[str | InterestInput] | None = None,
+    occupation_ids: list[str | OccupationInput] | None = None,
     association_contact_ids: list[str] | None = None,
 ) -> ContactResponse:
     """Create a new contact.
@@ -178,9 +308,9 @@ def create_contact(
         met_at: Date when contact was met.
         status_id: Status ID.
         notes: Additional notes.
-        tag_ids: List of tag IDs to associate.
-        interest_ids: List of interest IDs to associate.
-        occupation_ids: List of occupation IDs to associate.
+        tag_ids: List of tag IDs or objects to associate (supports temp IDs).
+        interest_ids: List of interest IDs or objects to associate (supports temp IDs).
+        occupation_ids: List of occupation IDs or objects to associate (supports temp IDs).
         association_contact_ids: List of contact IDs to associate.
 
     Returns:
@@ -194,6 +324,11 @@ def create_contact(
         status_result = supabase.table("statuses").select("id").eq("id", status_id).execute()
         if not status_result.data:
             raise StatusNotFoundError(status_id)
+
+    # Process tag/interest/occupation inputs (create new ones if needed)
+    processed_tag_ids = _process_tags(supabase, tag_ids)
+    processed_interest_ids = _process_interests(supabase, interest_ids)
+    processed_occupation_ids = _process_occupations(supabase, occupation_ids)
 
     # Create contact
     contact_data = {
@@ -213,19 +348,21 @@ def create_contact(
     contact_id = contact["id"]
 
     # Create or link tags
-    if tag_ids:
-        tag_links = [{"contact_id": contact_id, "tag_id": tid} for tid in tag_ids]
+    if processed_tag_ids:
+        tag_links = [{"contact_id": contact_id, "tag_id": tid} for tid in processed_tag_ids]
         supabase.table("contact_tags").insert(tag_links).execute()
 
     # Create or link interests
-    if interest_ids:
-        interest_links = [{"contact_id": contact_id, "interest_id": iid} for iid in interest_ids]
+    if processed_interest_ids:
+        interest_links = [
+            {"contact_id": contact_id, "interest_id": iid} for iid in processed_interest_ids
+        ]
         supabase.table("contact_interests").insert(interest_links).execute()
 
     # Create or link occupations
-    if occupation_ids:
+    if processed_occupation_ids:
         occupation_links = [
-            {"contact_id": contact_id, "occupation_id": oid} for oid in occupation_ids
+            {"contact_id": contact_id, "occupation_id": oid} for oid in processed_occupation_ids
         ]
         supabase.table("contact_occupations").insert(occupation_links).execute()
 
@@ -464,9 +601,9 @@ def update_contact(
     met_at: date | None = None,
     status_id: str | None = None,
     notes: str | None = None,
-    tag_ids: list[str] | None = None,
-    interest_ids: list[str] | None = None,
-    occupation_ids: list[str] | None = None,
+    tag_ids: list[str | TagInput] | None = None,
+    interest_ids: list[str | InterestInput] | None = None,
+    occupation_ids: list[str | OccupationInput] | None = None,
     association_contact_ids: list[str] | None = None,
 ) -> ContactResponse:
     """Update a contact.
@@ -483,9 +620,9 @@ def update_contact(
         met_at: Date when contact was met.
         status_id: Status ID.
         notes: Additional notes.
-        tag_ids: List of tag IDs to associate.
-        interest_ids: List of interest IDs to associate.
-        occupation_ids: List of occupation IDs to associate.
+        tag_ids: List of tag IDs or objects to associate (supports temp IDs).
+        interest_ids: List of interest IDs or objects to associate (supports temp IDs).
+        occupation_ids: List of occupation IDs or objects to associate (supports temp IDs).
         association_contact_ids: List of contact IDs to associate.
 
     Returns:
@@ -533,28 +670,34 @@ def update_contact(
 
     # Update tags if provided
     if tag_ids is not None:
+        # Process tag inputs (create new ones if needed)
+        processed_tag_ids = _process_tags(supabase, tag_ids)
         # Delete existing tags
         supabase.table("contact_tags").delete().eq("contact_id", contact_id).execute()
         # Insert new tags
-        if tag_ids:
-            tag_links = [{"contact_id": contact_id, "tag_id": tid} for tid in tag_ids]
+        if processed_tag_ids:
+            tag_links = [{"contact_id": contact_id, "tag_id": tid} for tid in processed_tag_ids]
             supabase.table("contact_tags").insert(tag_links).execute()
 
     # Update interests if provided
     if interest_ids is not None:
+        # Process interest inputs (create new ones if needed)
+        processed_interest_ids = _process_interests(supabase, interest_ids)
         supabase.table("contact_interests").delete().eq("contact_id", contact_id).execute()
-        if interest_ids:
+        if processed_interest_ids:
             interest_links = [
-                {"contact_id": contact_id, "interest_id": iid} for iid in interest_ids
+                {"contact_id": contact_id, "interest_id": iid} for iid in processed_interest_ids
             ]
             supabase.table("contact_interests").insert(interest_links).execute()
 
     # Update occupations if provided
     if occupation_ids is not None:
+        # Process occupation inputs (create new ones if needed)
+        processed_occupation_ids = _process_occupations(supabase, occupation_ids)
         supabase.table("contact_occupations").delete().eq("contact_id", contact_id).execute()
-        if occupation_ids:
+        if processed_occupation_ids:
             occupation_links = [
-                {"contact_id": contact_id, "occupation_id": oid} for oid in occupation_ids
+                {"contact_id": contact_id, "occupation_id": oid} for oid in processed_occupation_ids
             ]
             supabase.table("contact_occupations").insert(occupation_links).execute()
 

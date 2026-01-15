@@ -117,7 +117,7 @@ def create_storage_bucket(settings: Settings) -> None:
     try:
         # Try to get bucket info
         existing_buckets = supabase.storage.list_buckets()
-        bucket_exists = any(bucket["id"] == bucket_name for bucket in existing_buckets)
+        bucket_exists = any(bucket.id == bucket_name for bucket in existing_buckets)
 
         if bucket_exists:
             logger.info("✓ Bucket '%s' already exists", bucket_name)
@@ -214,7 +214,7 @@ def verify_setup(settings: Settings, db_url: str) -> None:
         )
 
         existing_buckets = supabase.storage.list_buckets()
-        bucket_exists = any(bucket["id"] == bucket_name for bucket in existing_buckets)
+        bucket_exists = any(bucket.id == bucket_name for bucket in existing_buckets)
 
         if bucket_exists:
             logger.info("✓ Storage bucket verified")

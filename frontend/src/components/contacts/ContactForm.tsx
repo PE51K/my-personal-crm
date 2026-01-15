@@ -11,15 +11,14 @@ import {
 } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { Autocomplete } from '@/components/ui/Autocomplete';
 import { PhotoUpload } from './PhotoUpload';
-import { useStatuses } from '@/hooks/useStatuses';
 import {
   useTagSuggestions,
   useInterestSuggestions,
   useOccupationSuggestions,
+  useStatusSuggestions,
 } from '@/hooks/useSuggestions';
 import type {
   Contact,
@@ -28,6 +27,7 @@ import type {
   Tag,
   Interest,
   Occupation,
+  Status,
 } from '@/types';
 
 interface ContactFormProps {
@@ -48,7 +48,6 @@ interface FormData {
   linkedin_url: string;
   github_username: string;
   met_at: string;
-  status_id: string;
   notes: string;
 }
 
@@ -67,9 +66,6 @@ export function ContactForm({
   isUploadingPhoto = false,
   submitLabel = 'Save Contact',
 }: ContactFormProps): ReactNode {
-  const { data: statusesResponse } = useStatuses();
-  const statuses = statusesResponse?.data ?? [];
-
   // Form state
   const [formData, setFormData] = useState<FormData>({
     first_name: initialData?.first_name ?? '',
@@ -79,7 +75,6 @@ export function ContactForm({
     linkedin_url: initialData?.linkedin_url ?? '',
     github_username: initialData?.github_username ?? '',
     met_at: initialData?.met_at ?? '',
-    status_id: initialData?.status_id ?? '',
     notes: initialData?.notes ?? '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
@@ -92,11 +87,15 @@ export function ContactForm({
   const [selectedOccupations, setSelectedOccupations] = useState<Occupation[]>(
     initialData?.occupations ?? []
   );
+  const [selectedStatus, setSelectedStatus] = useState<Status | null>(
+    initialData?.status ?? null
+  );
 
   // Autocomplete queries
   const [tagQuery, setTagQuery] = useState('');
   const [interestQuery, setInterestQuery] = useState('');
   const [occupationQuery, setOccupationQuery] = useState('');
+  const [statusQuery, setStatusQuery] = useState('');
 
   // Fetch suggestions
   const { data: tagSuggestions, isLoading: loadingTags } = useTagSuggestions(tagQuery);
@@ -104,6 +103,8 @@ export function ContactForm({
     useInterestSuggestions(interestQuery);
   const { data: occupationSuggestions, isLoading: loadingOccupations } =
     useOccupationSuggestions(occupationQuery);
+  const { data: statusSuggestions, isLoading: loadingStatuses } =
+    useStatusSuggestions(statusQuery);
 
   // Update form data when initialData changes
   useEffect(() => {
@@ -116,12 +117,12 @@ export function ContactForm({
         linkedin_url: initialData.linkedin_url ?? '',
         github_username: initialData.github_username ?? '',
         met_at: initialData.met_at ?? '',
-        status_id: initialData.status_id ?? '',
         notes: initialData.notes ?? '',
       });
       setSelectedTags(initialData.tags);
       setSelectedInterests(initialData.interests);
       setSelectedOccupations(initialData.occupations);
+      setSelectedStatus(initialData.status);
     }
   }, [initialData]);
 
@@ -160,16 +161,17 @@ export function ContactForm({
         linkedin_url: formData.linkedin_url.trim() || null,
         github_username: formData.github_username.trim() || null,
         met_at: formData.met_at || null,
-        status_id: formData.status_id || null,
+        status_id: selectedStatus?.id ?? null,
         notes: formData.notes.trim() || null,
-        tag_ids: selectedTags.map((t) => t.id),
-        interest_ids: selectedInterests.map((i) => i.id),
-        occupation_ids: selectedOccupations.map((o) => o.id),
+        // Send full objects (with id and name) to support temp IDs
+        tag_ids: selectedTags.map((t) => ({ id: t.id, name: t.name })),
+        interest_ids: selectedInterests.map((i) => ({ id: i.id, name: i.name })),
+        occupation_ids: selectedOccupations.map((o) => ({ id: o.id, name: o.name })),
       };
 
       await onSubmit(data);
     },
-    [formData, selectedTags, selectedInterests, selectedOccupations, onSubmit, validateForm]
+    [formData, selectedTags, selectedInterests, selectedOccupations, selectedStatus, onSubmit, validateForm]
   );
 
   const handleInputChange = useCallback(
@@ -200,7 +202,10 @@ export function ContactForm({
     setSelectedOccupations((prev) => [...prev, newOccupation]);
   }, []);
 
-  const statusOptions = statuses.map((s) => ({ value: s.id, label: s.name }));
+  const handleCreateStatus = useCallback((name: string): void => {
+    const newStatus: Status = { id: `temp-${Date.now()}`, name };
+    setSelectedStatus(newStatus);
+  }, []);
 
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6">
@@ -211,16 +216,14 @@ export function ContactForm({
       )}
 
       {/* Photo upload */}
-      {onPhotoUpload && (
-        <div className="flex justify-center pb-4 border-b border-gray-200">
-          <PhotoUpload
-            currentPhotoUrl={initialData?.photo_url}
-            name={`${formData.first_name} ${formData.last_name}`}
-            onUpload={onPhotoUpload}
-            isUploading={isUploadingPhoto}
-          />
-        </div>
-      )}
+      <div className="flex justify-center pb-4 border-b border-gray-200">
+        <PhotoUpload
+          currentPhotoUrl={initialData?.photo_url}
+          name={`${formData.first_name} ${formData.last_name}`}
+          onUpload={onPhotoUpload}
+          isUploading={isUploadingPhoto}
+        />
+      </div>
 
       {/* Basic info */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -269,12 +272,22 @@ export function ContactForm({
 
       {/* Status and date */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Select
+        <Autocomplete
           label="Status"
-          value={formData.status_id}
-          onChange={handleInputChange('status_id')}
-          options={statusOptions}
-          placeholder="Select a status"
+          placeholder="Select or create status..."
+          query={statusQuery}
+          onQueryChange={setStatusQuery}
+          suggestions={statusSuggestions ?? []}
+          selectedItems={selectedStatus ? [selectedStatus] : []}
+          onSelect={(item) => {
+            setSelectedStatus(item as Status);
+          }}
+          onRemove={() => {
+            setSelectedStatus(null);
+          }}
+          onCreate={handleCreateStatus}
+          isLoading={loadingStatuses}
+          singleSelect
         />
         <Input
           label="Met At"

@@ -77,6 +77,42 @@ class ContactAssociationBrief(BaseModel):
     last_name: str | None = None
 
 
+class TagInput(BaseModel):
+    """Tag input for creating/linking tags.
+
+    Attributes:
+        id: Tag ID (can be temp ID like 'temp-123' or real UUID).
+        name: Tag name (required for temp IDs).
+    """
+
+    id: str
+    name: str
+
+
+class InterestInput(BaseModel):
+    """Interest input for creating/linking interests.
+
+    Attributes:
+        id: Interest ID (can be temp ID like 'temp-123' or real UUID).
+        name: Interest name (required for temp IDs).
+    """
+
+    id: str
+    name: str
+
+
+class OccupationInput(BaseModel):
+    """Occupation input for creating/linking occupations.
+
+    Attributes:
+        id: Occupation ID (can be temp ID like 'temp-123' or real UUID).
+        name: Occupation name (required for temp IDs).
+    """
+
+    id: str
+    name: str
+
+
 class ContactCreateRequest(BaseModel):
     """Request to create a contact.
 
@@ -90,9 +126,9 @@ class ContactCreateRequest(BaseModel):
         met_at: Date when the contact was met.
         status_id: Status ID for the contact.
         notes: Additional notes.
-        tag_ids: List of tag IDs to associate.
-        interest_ids: List of interest IDs to associate.
-        occupation_ids: List of occupation IDs to associate.
+        tag_ids: List of tag IDs or objects to associate (supports temp IDs).
+        interest_ids: List of interest IDs or objects to associate (supports temp IDs).
+        occupation_ids: List of occupation IDs or objects to associate (supports temp IDs).
         association_contact_ids: List of contact IDs to associate.
     """
 
@@ -105,9 +141,9 @@ class ContactCreateRequest(BaseModel):
     met_at: date | None = None
     status_id: str | None = None
     notes: str | None = None
-    tag_ids: list[str] = Field(default_factory=list)
-    interest_ids: list[str] = Field(default_factory=list)
-    occupation_ids: list[str] = Field(default_factory=list)
+    tag_ids: list[str | TagInput] = Field(default_factory=list)
+    interest_ids: list[str | InterestInput] = Field(default_factory=list)
+    occupation_ids: list[str | OccupationInput] = Field(default_factory=list)
     association_contact_ids: list[str] = Field(default_factory=list)
 
 
@@ -124,9 +160,9 @@ class ContactUpdateRequest(BaseModel):
         met_at: Date when the contact was met.
         status_id: Status ID for the contact.
         notes: Additional notes.
-        tag_ids: List of tag IDs to associate.
-        interest_ids: List of interest IDs to associate.
-        occupation_ids: List of occupation IDs to associate.
+        tag_ids: List of tag IDs or objects to associate (supports temp IDs).
+        interest_ids: List of interest IDs or objects to associate (supports temp IDs).
+        occupation_ids: List of occupation IDs or objects to associate (supports temp IDs).
         association_contact_ids: List of contact IDs to associate.
     """
 
@@ -139,9 +175,9 @@ class ContactUpdateRequest(BaseModel):
     met_at: date | None = None
     status_id: str | None = None
     notes: str | None = None
-    tag_ids: list[str] | None = None
-    interest_ids: list[str] | None = None
-    occupation_ids: list[str] | None = None
+    tag_ids: list[str | TagInput] | None = None
+    interest_ids: list[str | InterestInput] | None = None
+    occupation_ids: list[str | OccupationInput] | None = None
     association_contact_ids: list[str] | None = None
 
 
