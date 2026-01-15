@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createStatus,
+  deleteStatus,
   getStatuses,
   reorderStatuses,
   updateStatus,
@@ -96,6 +97,20 @@ export function useReorderStatuses() {
 
   return useMutation({
     mutationFn: (data: StatusReorderRequest) => reorderStatuses(data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: statusKeys.lists() });
+    },
+  });
+}
+
+/**
+ * Hook to delete a status
+ */
+export function useDeleteStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => deleteStatus(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: statusKeys.lists() });
     },

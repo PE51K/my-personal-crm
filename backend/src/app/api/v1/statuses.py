@@ -227,3 +227,59 @@ async def reorder_statuses(
         supabase.table("statuses").update({"sort_order": index + 1}).eq("id", status_id).execute()
 
     return StatusReorderResponse(message="Statuses reordered successfully")
+
+
+@router.delete(
+    "/{status_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete status",
+    description="Delete a status (only if not in use by any contacts).",
+    responses={
+        404: {
+            "description": "Status not found",
+        },
+        409: {
+            "description": "Status is in use and cannot be deleted",
+        },
+    },
+)
+async def delete_status(
+    status_id: str,
+    current_user: CurrentOwner,
+    supabase: SupabaseClient,
+) -> None:
+    """Delete a status.
+
+    Deletes the status only if it's not assigned to any contacts.
+    If contacts are using this status, returns a 409 Conflict error.
+
+    Args:
+        status_id: Status ID to delete.
+        current_user: Current authenticated owner.
+        supabase: Supabase client instance.
+
+    Raises:
+        StatusNotFoundError: If status doesn't exist.
+        HTTPException: If status is in use by contacts.
+    """
+    from fastapi import HTTPException
+
+    # Check status exists
+    existing = supabase.table("statuses").select("*").eq("id", status_id).execute()
+    if not existing.data:
+        raise StatusNotFoundError(status_id)
+
+    # Check if status is in use
+    count_result = (
+        supabase.table("contacts").select("id", count="exact").eq("status_id", status_id).execute()
+    )
+    contact_count = count_result.count or 0
+
+    if contact_count > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot delete status: {contact_count} contact(s) are using it",
+        )
+
+    # Delete status
+    supabase.table("statuses").delete().eq("id", status_id).execute()

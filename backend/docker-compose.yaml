@@ -3,6 +3,7 @@
 # =============================================================================
 # This compose file defines the API service for the Personal CRM backend.
 # It uses Python 3.12 with uv for dependency management.
+# Migrations and storage bucket setup run automatically on startup.
 # =============================================================================
 
 services:
@@ -17,23 +18,24 @@ services:
       # Mount source code for hot reload during development
       - ./src:/app/src:ro
     environment:
-      # Supabase Configuration
+      # Supabase Configuration (Required)
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_DB_URL=${SUPABASE_DB_URL}
       - SUPABASE_STORAGE_BUCKET=${SUPABASE_STORAGE_BUCKET:-contact-photos}
-      # Application Configuration
+      # Application Configuration (Optional - have defaults)
       - APP_ENV=${APP_ENV:-development}
       - APP_DEBUG=${APP_DEBUG:-true}
       - APP_LOG_LEVEL=${APP_LOG_LEVEL:-INFO}
-      # Security
+      # Security (Optional - have defaults)
       - CORS_ORIGINS=${CORS_ORIGINS:-["http://localhost:3000"]}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
       - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-7}
-      # Server
+      # Server (Optional - have defaults)
       - HOST=${HOST:-0.0.0.0}
       - PORT=${PORT:-8000}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3

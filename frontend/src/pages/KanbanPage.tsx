@@ -4,7 +4,7 @@
 
 import { type ReactNode, useCallback, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
-import { KanbanBoard } from '@/components/kanban/KanbanBoard';
+import { KanbanBoard, StatusManagement } from '@/components/kanban';
 import { FilterPanel } from '@/components/kanban/FilterPanel';
 import { PersonCard } from '@/components/contacts/PersonCard';
 import { Button } from '@/components/ui/Button';
@@ -16,6 +16,7 @@ import type { ContactListItem, ContactListParams } from '@/types';
 export function KanbanPage(): ReactNode {
   const [selectedContact, setSelectedContact] = useState<ContactListItem | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [showStatusManagement, setShowStatusManagement] = useState(false);
   const [filters, setFilters] = useState<ContactListParams>({});
 
   const { data: statusesData, isLoading: isLoadingStatuses } = useStatuses();
@@ -50,12 +51,35 @@ export function KanbanPage(): ReactNode {
               Organize your contacts by status
             </p>
           </div>
-          <Button
-            variant="secondary"
-            onClick={() => { setShowFilters(!showFilters); }}
-          >
-            {showFilters ? 'Hide Filters' : 'Show Filters'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => { setShowStatusManagement(true); }}
+              leftIcon={
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+                  />
+                </svg>
+              }
+            >
+              Manage Statuses
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => { setShowFilters(!showFilters); }}
+            >
+              {showFilters ? 'Hide Filters' : 'Show Filters'}
+            </Button>
+          </div>
         </div>
 
         {showFilters && (
@@ -81,6 +105,11 @@ export function KanbanPage(): ReactNode {
             onClose={() => { setSelectedContact(null); }}
           />
         )}
+
+        <StatusManagement
+          isOpen={showStatusManagement}
+          onClose={() => { setShowStatusManagement(false); }}
+        />
       </div>
     </Layout>
   );

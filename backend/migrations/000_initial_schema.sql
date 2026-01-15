@@ -119,6 +119,7 @@ CREATE INDEX IF NOT EXISTS idx_contacts_met_at ON contacts(met_at);
 CREATE INDEX IF NOT EXISTS idx_contact_associations_source ON contact_associations(source_contact_id);
 CREATE INDEX IF NOT EXISTS idx_contact_associations_target ON contact_associations(target_contact_id);
 CREATE INDEX IF NOT EXISTS idx_app_owner_supabase_user_id ON app_owner(supabase_user_id);
+CREATE INDEX IF NOT EXISTS idx_statuses_is_active ON statuses(is_active);
 
 -- =============================================================================
 -- TRIGGER FOR UPDATED_AT
@@ -141,36 +142,40 @@ CREATE TRIGGER update_contacts_updated_at
 -- =============================================================================
 -- DEFAULT STATUS SEED DATA
 -- =============================================================================
--- NOTE: Statuses are seeded during bootstrap in app/services/auth.py
--- This prevents duplication when migrations run before bootstrap.
--- DO NOT insert statuses here!
+-- Seed default statuses only if the table is empty
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM statuses LIMIT 1) THEN
+        INSERT INTO statuses (name, sort_order, is_active) VALUES
+            ('New', 1, true),
+            ('Active', 2, true),
+            ('Inactive', 3, true),
+            ('Archived', 4, true);
+    END IF;
+END $$;
 
 -- =============================================================================
--- VERIFICATION QUERIES
+-- VERIFICATION NOTES
 -- =============================================================================
-
--- Verify tables were created
-SELECT 
-    schemaname,
-    tablename
-FROM pg_tables 
-WHERE schemaname = 'public' 
-  AND tablename IN (
-    'app_owner', 'statuses', 'contacts', 'tags', 'interests', 
-    'occupations', 'contact_tags', 'contact_interests', 
-    'contact_occupations', 'contact_associations'
-  )
-ORDER BY tablename;
-
--- Verify indexes were created
-SELECT 
-    schemaname,
-    tablename,
-    indexname
-FROM pg_indexes 
-WHERE schemaname = 'public' 
-  AND indexname LIKE 'idx_%'
-ORDER BY tablename, indexname;
-
--- Verify default statuses were created
-SELECT id, name, sort_order, is_active FROM statuses ORDER BY sort_order;
+-- The application's verify_setup() function will automatically verify:
+-- - All required tables exist
+-- - Storage bucket is configured
+-- - Default statuses are seeded
+--
+-- For manual verification, you can run these queries directly in psql:
+--
+-- -- Verify tables were created:
+-- SELECT schemaname, tablename FROM pg_tables 
+-- WHERE schemaname = 'public' AND tablename IN (
+--   'app_owner', 'statuses', 'contacts', 'tags', 'interests', 
+--   'occupations', 'contact_tags', 'contact_interests', 
+--   'contact_occupations', 'contact_associations'
+-- ) ORDER BY tablename;
+--
+-- -- Verify indexes were created:
+-- SELECT schemaname, tablename, indexname FROM pg_indexes 
+-- WHERE schemaname = 'public' AND indexname LIKE 'idx_%'
+-- ORDER BY tablename, indexname;
+--
+-- -- Verify default statuses:
+-- SELECT id, name, sort_order, is_active FROM statuses ORDER BY sort_order;

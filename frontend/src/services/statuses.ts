@@ -40,3 +40,10 @@ export async function updateStatus(id: string, data: StatusUpdateRequest): Promi
 export async function reorderStatuses(data: StatusReorderRequest): Promise<StatusReorderResponse> {
   return api.post<StatusReorderResponse>('/statuses/reorder', data);
 }
+
+/**
+ * Delete a status
+ */
+export async function deleteStatus(id: string): Promise<void> {
+  return api.delete(`/statuses/${id}`);
+}

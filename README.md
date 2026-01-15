@@ -69,14 +69,24 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
-Edit `backend/.env` with your Supabase credentials:
+Edit `backend/.env` with your Supabase credentials (all found in Supabase Dashboard → Project Settings):
 
 ```bash
+# API → Project URL
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-SUPABASE_JWT_SECRET=your-jwt-secret
+
+# API → service_role key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+
+# Database → Connection String → Transaction Mode
+# (only needed for init container to run migrations)
+SUPABASE_DB_URL=postgresql://postgres.your-ref:your-password@aws-0-region.pooler.supabase.com:6543/postgres
+
+# Storage bucket (default: contact-photos)
 SUPABASE_STORAGE_BUCKET=contact-photos
 ```
+
+That's it! All other settings have sensible defaults.
 
 ### 3. Start the Services
 
@@ -85,9 +95,15 @@ docker compose up --build
 ```
 
 This will:
-1. Build the backend container with Python 3.12 and uv
-2. Build the frontend container with Node 20 and Nginx
-3. Start both services on a shared Docker network
+1. Build and run the initialization container that:
+   - Runs all database migrations
+   - Creates the storage bucket for contact photos
+   - Verifies the setup
+2. Build the backend container with Python 3.12 and uv
+3. Build the frontend container with Node 20 and Nginx
+4. Start both services on a shared Docker network
+
+**Note:** The initialization container runs once and exits. The backend API will only start after initialization completes successfully.
 
 ### 4. Access the Application
 
@@ -202,15 +218,16 @@ Both services communicate over a shared Docker network (`personal-crm-network`):
 
 ### Backend (`backend/.env`)
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SUPABASE_URL` | Supabase project URL | Required |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key | Required |
-| `SUPABASE_JWT_SECRET` | JWT secret for verification | Required |
-| `SUPABASE_STORAGE_BUCKET` | Storage bucket name | `contact-photos` |
-| `APP_ENV` | Environment name | `development` |
-| `APP_DEBUG` | Enable debug mode | `true` |
-| `CORS_ORIGINS` | Allowed CORS origins | `["http://localhost:3000"]` |
+Only 4 variables are required. All others have sensible defaults.
+
+| Variable | Description | Used By | Required |
+|----------|-------------|---------|----------|
+| `SUPABASE_URL` | Supabase project URL | API + Init | ✓ Required |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key | API + Init | ✓ Required |
+| `SUPABASE_DB_URL` | PostgreSQL connection string | Init only (migrations) | ✓ Required |
+| `SUPABASE_STORAGE_BUCKET` | Storage bucket name | API + Init | Optional (default: `contact-photos`) |
+
+**Note:** The backend API uses the Supabase SDK and doesn't directly connect to PostgreSQL. `SUPABASE_DB_URL` is only needed by the initialization container to run SQL migrations via `psql`.
 
 ### Frontend (`frontend/.env`)
 

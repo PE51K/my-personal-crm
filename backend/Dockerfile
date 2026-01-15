@@ -54,8 +54,9 @@ WORKDIR /app
 # Copy the virtual environment from builder
 COPY --from=builder --chown=appuser:appgroup /app/.venv /app/.venv
 
-# Copy application source code
+# Copy application source code and migrations
 COPY --from=builder --chown=appuser:appgroup /app/src /app/src
+COPY --from=builder --chown=appuser:appgroup /app/migrations /app/migrations
 
 # Set environment variables
 ENV PATH="/app/.venv/bin:$PATH"

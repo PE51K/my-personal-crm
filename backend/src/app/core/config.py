@@ -25,13 +25,7 @@ class Settings(BaseSettings):
     # Supabase Configuration (Required)
     supabase_url: Annotated[str, Field(description="Supabase project URL")]
     supabase_service_role_key: Annotated[str, Field(description="Supabase service role key")]
-    supabase_jwt_secret: Annotated[
-        str | None,
-        Field(
-            default=None,
-            description="[DEPRECATED] Legacy JWT secret - no longer needed with JWKS verification",
-        ),
-    ]
+    supabase_db_url: Annotated[str, Field(description="Supabase database connection URL")]
     supabase_storage_bucket: Annotated[
         str, Field(default="contact-photos", description="Storage bucket name")
     ]

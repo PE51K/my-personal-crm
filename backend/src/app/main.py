@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.core.errors import APIError
+from app.core.startup import initialize_app
 
 # Configure logging
 logging.basicConfig(
@@ -35,6 +36,14 @@ async def lifespan(app: FastAPI):  # noqa: ANN201
     # Startup
     settings = get_settings()
     logger.info("Starting Personal CRM API in %s mode", settings.app_env)
+    
+    # Initialize database and storage
+    try:
+        initialize_app(settings)
+    except Exception as e:
+        logger.error("Failed to initialize application: %s", e)
+        raise
+    
     yield
     # Shutdown
     logger.info("Shutting down Personal CRM API")

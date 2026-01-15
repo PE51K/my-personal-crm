@@ -16,14 +16,6 @@ from app.schemas.auth import AuthTokenResponse, UserResponse
 
 logger = logging.getLogger(__name__)
 
-# Default statuses to seed during bootstrap
-DEFAULT_STATUSES = [
-    {"name": "New", "sort_order": 1, "is_active": True},
-    {"name": "Active", "sort_order": 2, "is_active": True},
-    {"name": "Inactive", "sort_order": 3, "is_active": True},
-    {"name": "Archived", "sort_order": 4, "is_active": True},
-]
-
 
 def check_bootstrap_status(supabase: Client) -> bool:
     """Check if the application has been initialized with an owner.
@@ -90,9 +82,6 @@ def bootstrap_owner(
                 "email": email,
             }
         ).execute()
-
-        # Seed default statuses
-        supabase.table("statuses").insert(DEFAULT_STATUSES).execute()
 
         # Sign in to get tokens
         sign_in_response = supabase.auth.sign_in_with_password(

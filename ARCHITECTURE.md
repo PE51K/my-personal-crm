@@ -90,7 +90,7 @@
 
 - [ ] **B.1** `GET /api/v1/auth/bootstrap/status` returns `{ "initialized": false }` when `app_owner` table is empty
 - [ ] **B.2** `GET /api/v1/auth/bootstrap/status` returns `{ "initialized": true }` when `app_owner` has a row
-- [ ] **B.3** `POST /api/v1/auth/bootstrap` creates Supabase Auth user, inserts `app_owner` row, seeds default statuses, returns tokens
+- [ ] **B.3** `POST /api/v1/auth/bootstrap` creates Supabase Auth user, inserts `app_owner` row, returns tokens (statuses are seeded by migration)
 - [ ] **B.4** `POST /api/v1/auth/bootstrap` returns HTTP 409 if `app_owner` already exists
 - [ ] **B.5** `POST /api/v1/auth/login` exchanges email+password for access/refresh tokens via Supabase Auth
 - [ ] **B.6** `POST /api/v1/auth/login` returns HTTP 401 for invalid credentials
@@ -107,7 +107,7 @@
 - [ ] **B.14** Migration creates lookup tables: `tags`, `interests`, `occupations`
 - [ ] **B.15** Migration creates join tables: `contact_tags`, `contact_interests`, `contact_occupations`
 - [ ] **B.16** Migration creates `contact_associations` table for graph edges
-- [ ] **B.17** Default statuses are seeded: "New", "Active", "Inactive", "Archived"
+- [ ] **B.17** Default statuses are seeded by migration: "New", "Active", "Inactive", "Archived"
 
 ##### Contacts CRUD
 
@@ -126,6 +126,7 @@
 - [ ] **B.27** `POST /api/v1/statuses` creates new status
 - [ ] **B.28** `PATCH /api/v1/statuses/{id}` updates status name/is_active
 - [ ] **B.29** `POST /api/v1/statuses/reorder` updates `sort_order` for all statuses
+- [ ] **B.29a** `DELETE /api/v1/statuses/{id}` deletes status if not in use by any contacts
 - [ ] **B.30** `GET /api/v1/suggestions/tags?q=` returns matching tags (autocomplete)
 - [ ] **B.31** `GET /api/v1/suggestions/interests?q=` returns matching interests
 - [ ] **B.32** `GET /api/v1/suggestions/occupations?q=` returns matching occupations
@@ -403,33 +404,24 @@ my-personal-crm/
 
 ```bash
 # =============================================================================
-# Supabase Configuration (Required)
+# Supabase Configuration (REQUIRED)
 # =============================================================================
+# Find these in your Supabase Dashboard: Project Settings
+
+# API → Project URL
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-SUPABASE_JWT_SECRET=your-jwt-secret
+
+# API → service_role key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+
+# Database → Connection String → Transaction Mode
+SUPABASE_DB_URL=postgresql://postgres.your-ref:your-password@aws-0-region.pooler.supabase.com:6543/postgres
+
+# Storage bucket name (default: contact-photos)
 SUPABASE_STORAGE_BUCKET=contact-photos
-
-# =============================================================================
-# Application Configuration
-# =============================================================================
-APP_ENV=development
-APP_DEBUG=true
-APP_LOG_LEVEL=INFO
-
-# =============================================================================
-# Security
-# =============================================================================
-CORS_ORIGINS=["http://localhost:3000"]
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-REFRESH_TOKEN_EXPIRE_DAYS=7
-
-# =============================================================================
-# Server
-# =============================================================================
-HOST=0.0.0.0
-PORT=8000
 ```
+
+All other settings (CORS, token expiration, logging, etc.) have sensible defaults and can be omitted unless you need to customize them.
 
 ### Frontend (`frontend/.env.example`)
 
@@ -928,6 +920,29 @@ Reorder statuses.
 ```json
 {
   "message": "Statuses reordered successfully"
+}
+```
+
+---
+
+#### `DELETE /api/v1/statuses/{id}`
+
+Delete a status.
+
+**Authentication:** Required
+
+**Path Parameters:**
+- `id` (string): Status UUID
+
+**Response 204:** No Content (successful deletion)
+
+**Response 404:** Status not found
+
+**Response 409:** Conflict - Status is in use by contacts
+
+```json
+{
+  "detail": "Cannot delete status: N contact(s) are using it"
 }
 ```
 
@@ -2188,13 +2203,23 @@ CREATE INDEX idx_contact_associations_target ON contact_associations(target_cont
 
 ### Default Status Seed
 
+Default statuses are seeded during database migration (idempotent):
+
 ```sql
+-- Seeded only if statuses table is empty
 INSERT INTO statuses (name, sort_order, is_active) VALUES
     ('New', 1, TRUE),
     ('Active', 2, TRUE),
     ('Inactive', 3, TRUE),
     ('Archived', 4, TRUE);
 ```
+
+**Note:** Statuses are fully manageable by users through the Status Management UI:
+- Create new statuses
+- Edit status names
+- Toggle active/inactive
+- Reorder via drag-and-drop
+- Delete unused statuses (only if not assigned to any contacts)
 
 ---
 
