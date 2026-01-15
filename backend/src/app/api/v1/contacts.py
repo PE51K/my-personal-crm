@@ -98,7 +98,6 @@ async def list_contacts_endpoint(
     created_at_to: date | None = Query(default=None, description="Filter by creation date (to)"),
     met_at_from: date | None = Query(default=None, description="Filter by met date (from)"),
     met_at_to: date | None = Query(default=None, description="Filter by met date (to)"),
-    cluster_id: int | None = Query(default=None, description="Filter by cluster ID"),
     search: str | None = Query(default=None, description="Search in names"),
     sort_by: str = Query(default="created_at", description="Sort field"),
     sort_order: str = Query(default="desc", description="Sort order (asc/desc)"),
@@ -106,8 +105,7 @@ async def list_contacts_endpoint(
     """List contacts with filtering and pagination.
 
     Returns a paginated list of contacts. Supports filtering by various
-    criteria including status, tags, interests, occupations, dates, and
-    cluster membership.
+    criteria including status, tags, interests, occupations, and dates.
 
     Args:
         current_user: Current authenticated owner.
@@ -122,7 +120,6 @@ async def list_contacts_endpoint(
         created_at_to: Filter by creation date (to).
         met_at_from: Filter by met date (from).
         met_at_to: Filter by met date (to).
-        cluster_id: Filter by cluster ID.
         search: Search in names.
         sort_by: Field to sort by.
         sort_order: Sort order (asc/desc).
@@ -147,7 +144,6 @@ async def list_contacts_endpoint(
         created_at_to=created_at_to,
         met_at_from=met_at_from,
         met_at_to=met_at_to,
-        cluster_id=cluster_id,
         search=search,
         sort_by=sort_by,
         sort_order=sort_order,

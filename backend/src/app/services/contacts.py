@@ -212,7 +212,7 @@ def _build_contact_response(
     # Fetch associations (contacts linked to this contact)
     target_select = (
         "target_contact_id, "
-        "contacts!contact_associations_target_contact_id_fkey(id, first_name, last_name)"
+        "contacts!contact_associations_target_contact_id_fkey(id, first_name, middle_name, last_name)"
     )
     associations_result = (
         supabase.table("contact_associations")
@@ -224,7 +224,7 @@ def _build_contact_response(
     # Also get reverse associations
     source_select = (
         "source_contact_id, "
-        "contacts!contact_associations_source_contact_id_fkey(id, first_name, last_name)"
+        "contacts!contact_associations_source_contact_id_fkey(id, first_name, middle_name, last_name)"
     )
     reverse_result = (
         supabase.table("contact_associations")
@@ -272,7 +272,6 @@ def _build_contact_response(
         interests=interests,
         occupations=occupations,
         associations=associations,
-        cluster_id=contact.get("cluster_id"),
         sort_order_in_status=contact.get("sort_order_in_status", 0),
         created_at=contact["created_at"],
         updated_at=contact["updated_at"],
@@ -410,7 +409,6 @@ def list_contacts(
     created_at_to: date | None = None,
     met_at_from: date | None = None,
     met_at_to: date | None = None,
-    cluster_id: int | None = None,
     search: str | None = None,
     sort_by: str = "created_at",
     sort_order: str = "desc",
@@ -429,7 +427,6 @@ def list_contacts(
         created_at_to: Filter by creation date (to).
         met_at_from: Filter by met date (from).
         met_at_to: Filter by met date (to).
-        cluster_id: Filter by cluster ID.
         search: Search in names.
         sort_by: Field to sort by.
         sort_order: Sort order (asc/desc).
@@ -456,14 +453,20 @@ def list_contacts(
     if met_at_to:
         query = query.lte("met_at", met_at_to.isoformat())
 
-    if cluster_id is not None:
-        query = query.eq("cluster_id", cluster_id)
-
+    # Track search words for post-filtering if multi-word search
+    search_words: list[str] = []
     if search:
         # Search in first_name, last_name, middle_name
-        query = query.or_(
-            f"first_name.ilike.%{search}%,last_name.ilike.%{search}%,middle_name.ilike.%{search}%"
-        )
+        # Split search into words to support full name search like "John Smith"
+        search_words = search.strip().lower().split()
+        # Build OR conditions for all words - this gets contacts matching ANY word
+        # We'll filter for ALL words in post-processing for multi-word searches
+        or_conditions = []
+        for word in search_words:
+            or_conditions.append(f"first_name.ilike.%{word}%")
+            or_conditions.append(f"last_name.ilike.%{word}%")
+            or_conditions.append(f"middle_name.ilike.%{word}%")
+        query = query.or_(",".join(or_conditions))
 
     # Get contact IDs filtered by tags/interests/occupations
     contact_ids_to_filter: set[str] | None = None
@@ -534,6 +537,16 @@ def list_contacts(
     # Build response items
     items = []
     for contact in result.data:
+        # Post-filter for multi-word search - all words must match at least one name field
+        if len(search_words) > 1:
+            full_name_parts = [
+                (contact.get("first_name") or "").lower(),
+                (contact.get("middle_name") or "").lower(),
+                (contact.get("last_name") or "").lower(),
+            ]
+            full_name = " ".join(full_name_parts)
+            if not all(word in full_name for word in search_words):
+                continue
         # Fetch status
         status = None
         if contact.get("status_id"):
@@ -567,6 +580,7 @@ def list_contacts(
             ContactListItem(
                 id=contact["id"],
                 first_name=contact["first_name"],
+                middle_name=contact.get("middle_name"),
                 last_name=contact.get("last_name"),
                 status=status,
                 photo_url=photo_url,

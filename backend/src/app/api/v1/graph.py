@@ -4,7 +4,6 @@ from fastapi import APIRouter, status
 
 from app.core.deps import CurrentOwner, SupabaseClient
 from app.schemas.graph import (
-    ClusterRecomputeResponse,
     EdgeCreateRequest,
     EdgeResponse,
     GraphResponse,
@@ -13,7 +12,6 @@ from app.services.graph import (
     create_edge,
     delete_edge,
     get_graph,
-    recompute_clusters,
 )
 
 router = APIRouter(prefix="/graph", tags=["Graph"])
@@ -31,15 +29,14 @@ async def get_graph_endpoint(
 ) -> GraphResponse:
     """Get all contacts and associations for graph visualization.
 
-    Returns all contacts as nodes and associations as edges,
-    along with cluster information for grouping.
+    Returns all contacts as nodes and associations as edges.
 
     Args:
         current_user: Current authenticated owner.
         supabase: Supabase client instance.
 
     Returns:
-        Graph with nodes, edges, and clusters.
+        Graph with nodes and edges.
     """
     return get_graph(supabase)
 
@@ -149,29 +146,3 @@ async def delete_edge_endpoint(
         GraphEdgeNotFoundError: If edge doesn't exist.
     """
     delete_edge(supabase, edge_id)
-
-
-@router.post(
-    "/clusters/recompute",
-    response_model=ClusterRecomputeResponse,
-    summary="Recompute clusters",
-    description="Recompute clusters using connected components algorithm.",
-)
-async def recompute_clusters_endpoint(
-    current_user: CurrentOwner,
-    supabase: SupabaseClient,
-) -> ClusterRecomputeResponse:
-    """Recompute clusters using connected components algorithm.
-
-    Analyzes the association graph and assigns cluster IDs to
-    contacts based on connectivity. Contacts in the same connected
-    component will have the same cluster_id.
-
-    Args:
-        current_user: Current authenticated owner.
-        supabase: Supabase client instance.
-
-    Returns:
-        Cluster recomputation statistics.
-    """
-    return recompute_clusters(supabase)

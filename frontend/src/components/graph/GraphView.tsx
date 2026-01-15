@@ -149,21 +149,7 @@ export function GraphView({
         <Background />
         <Controls />
         <MiniMap
-          nodeColor={(node) => {
-            const nodeData = node.data as ContactNodeData | undefined;
-            const clusterId = nodeData?.cluster_id;
-            const clusterColors: Record<number, string> = {
-              1: '#3B82F6',
-              2: '#10B981',
-              3: '#8B5CF6',
-              4: '#F59E0B',
-              5: '#EF4444',
-              6: '#EC4899',
-              7: '#6366F1',
-              8: '#F97316',
-            };
-            return clusterId ? clusterColors[clusterId % 8] || '#9CA3AF' : '#9CA3AF';
-          }}
+          nodeColor="#9CA3AF"
           maskColor="rgb(240, 240, 240, 0.8)"
         />
       </ReactFlow>

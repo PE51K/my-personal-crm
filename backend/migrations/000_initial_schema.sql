@@ -42,7 +42,6 @@ CREATE TABLE IF NOT EXISTS contacts (
     status_id UUID REFERENCES statuses(id) ON DELETE SET NULL,
     notes TEXT,
     photo_path TEXT,
-    cluster_id INTEGER,
     sort_order_in_status INTEGER NOT NULL DEFAULT 0,
     position_x FLOAT,
     position_y FLOAT,
@@ -113,7 +112,6 @@ CREATE TABLE IF NOT EXISTS contact_associations (
 -- =============================================================================
 
 CREATE INDEX IF NOT EXISTS idx_contacts_status_id ON contacts(status_id);
-CREATE INDEX IF NOT EXISTS idx_contacts_cluster_id ON contacts(cluster_id);
 CREATE INDEX IF NOT EXISTS idx_contacts_created_at ON contacts(created_at);
 CREATE INDEX IF NOT EXISTS idx_contacts_met_at ON contacts(met_at);
 CREATE INDEX IF NOT EXISTS idx_contact_associations_source ON contact_associations(source_contact_id);

@@ -19,9 +19,11 @@ import {
   useInterestSuggestions,
   useOccupationSuggestions,
   useStatusSuggestions,
+  useContactSuggestions,
 } from '@/hooks/useSuggestions';
 import type {
   Contact,
+  ContactAssociationBrief,
   ContactCreateRequest,
   ContactUpdateRequest,
   Tag,
@@ -90,12 +92,16 @@ export function ContactForm({
   const [selectedStatus, setSelectedStatus] = useState<Status | null>(
     initialData?.status ?? null
   );
+  const [selectedAssociations, setSelectedAssociations] = useState<ContactAssociationBrief[]>(
+    initialData?.associations ?? []
+  );
 
   // Autocomplete queries
   const [tagQuery, setTagQuery] = useState('');
   const [interestQuery, setInterestQuery] = useState('');
   const [occupationQuery, setOccupationQuery] = useState('');
   const [statusQuery, setStatusQuery] = useState('');
+  const [associationQuery, setAssociationQuery] = useState('');
 
   // Fetch suggestions
   const { data: tagSuggestions, isLoading: loadingTags } = useTagSuggestions(tagQuery);
@@ -105,6 +111,14 @@ export function ContactForm({
     useOccupationSuggestions(occupationQuery);
   const { data: statusSuggestions, isLoading: loadingStatuses } =
     useStatusSuggestions(statusQuery);
+
+  // For associations, exclude current contact and already selected ones
+  const excludeContactIds = [
+    ...(initialData?.id ? [initialData.id] : []),
+    ...selectedAssociations.map((a) => a.id),
+  ];
+  const { data: associationSuggestions, isLoading: loadingAssociations } =
+    useContactSuggestions(associationQuery, excludeContactIds);
 
   // Update form data when initialData changes
   useEffect(() => {
@@ -123,6 +137,7 @@ export function ContactForm({
       setSelectedInterests(initialData.interests);
       setSelectedOccupations(initialData.occupations);
       setSelectedStatus(initialData.status);
+      setSelectedAssociations(initialData.associations);
     }
   }, [initialData]);
 
@@ -167,11 +182,12 @@ export function ContactForm({
         tag_ids: selectedTags.map((t) => ({ id: t.id, name: t.name })),
         interest_ids: selectedInterests.map((i) => ({ id: i.id, name: i.name })),
         occupation_ids: selectedOccupations.map((o) => ({ id: o.id, name: o.name })),
+        association_contact_ids: selectedAssociations.map((a) => a.id),
       };
 
       await onSubmit(data);
     },
-    [formData, selectedTags, selectedInterests, selectedOccupations, selectedStatus, onSubmit, validateForm]
+    [formData, selectedTags, selectedInterests, selectedOccupations, selectedAssociations, selectedStatus, onSubmit, validateForm]
   );
 
   const handleInputChange = useCallback(
@@ -348,6 +364,33 @@ export function ContactForm({
           isLoading={loadingOccupations}
         />
       </div>
+
+      {/* Associations */}
+      <Autocomplete
+        label="Associations"
+        placeholder="Search contacts to associate..."
+        query={associationQuery}
+        onQueryChange={setAssociationQuery}
+        suggestions={associationSuggestions?.map((a) => ({
+          id: a.id,
+          name: [a.first_name, a.middle_name, a.last_name].filter(Boolean).join(' '),
+        })) ?? []}
+        selectedItems={selectedAssociations.map((a) => ({
+          id: a.id,
+          name: [a.first_name, a.middle_name, a.last_name].filter(Boolean).join(' '),
+        }))}
+        onSelect={(item) => {
+          const contact = associationSuggestions?.find((a) => a.id === item.id);
+          if (contact) {
+            setSelectedAssociations((prev) => [...prev, contact]);
+          }
+        }}
+        onRemove={(item) => {
+          setSelectedAssociations((prev) => prev.filter((a) => a.id !== item.id));
+        }}
+        isLoading={loadingAssociations}
+        allowCreate={false}
+      />
 
       {/* Notes */}
       <Textarea

@@ -35,6 +35,7 @@ interface AuthContextState {
   isLoading: boolean;
   isInitialized: boolean | null;
   checkingInitialization: boolean;
+  checkingAuth: boolean; // True when we have a token but user is still loading
   login: (credentials: AuthCredentials) => Promise<void>;
   bootstrap: (credentials: AuthCredentials) => Promise<void>;
   logout: () => Promise<void>;
@@ -162,9 +163,13 @@ export function AuthProvider({ children }: AuthProviderProps): ReactNode {
     };
   }, [queryClient, refetchBootstrapStatus]);
 
+  // Check if we have a token but user is still loading (avoid login flash)
+  const hasToken = !!getAccessToken();
+  const checkingAuth = hasToken && isInitialized === true && isLoadingUser;
+
   const value: AuthContextState = {
     user: user ?? null,
-    isAuthenticated: !!user && !!getAccessToken(),
+    isAuthenticated: !!user && hasToken,
     isLoading:
       isLoadingUser ||
       loginMutation.isPending ||
@@ -172,6 +177,7 @@ export function AuthProvider({ children }: AuthProviderProps): ReactNode {
       logoutMutation.isPending,
     isInitialized,
     checkingInitialization,
+    checkingAuth,
     login: handleLogin,
     bootstrap: handleBootstrap,
     logout: handleLogout,

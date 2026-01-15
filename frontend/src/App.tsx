@@ -31,10 +31,10 @@ function LoadingScreen(): React.JSX.Element {
  * Main App component
  */
 export default function App(): React.JSX.Element {
-  const { checkingInitialization, isInitialized, isAuthenticated } = useAuth();
+  const { checkingInitialization, isInitialized, isAuthenticated, checkingAuth } = useAuth();
 
-  // Show loading screen while checking initialization status
-  if (checkingInitialization || isInitialized === null) {
+  // Show loading screen while checking initialization status or auth status
+  if (checkingInitialization || isInitialized === null || checkingAuth) {
     return <LoadingScreen />;
   }
 

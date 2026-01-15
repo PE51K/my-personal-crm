@@ -2,24 +2,37 @@
  * Add contact page
  */
 
-import { type ReactNode, useCallback } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { ContactForm } from '@/components/contacts/ContactForm';
 import { Button } from '@/components/ui/Button';
-import { useCreateContact } from '@/hooks/useContacts';
+import { useCreateContact, useUploadContactPhoto } from '@/hooks/useContacts';
 import type { ContactCreateRequest, ContactUpdateRequest } from '@/types';
 
 export function AddContactPage(): ReactNode {
   const navigate = useNavigate();
   const createContact = useCreateContact();
+  const uploadPhoto = useUploadContactPhoto();
+  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
+
+  const handlePhotoUpload = useCallback((file: File) => {
+    setPendingPhoto(file);
+  }, []);
 
   const handleSubmit = useCallback(
     async (data: ContactCreateRequest | ContactUpdateRequest) => {
-      await createContact.mutateAsync(data as ContactCreateRequest);
+      // Create the contact first
+      const contact = await createContact.mutateAsync(data as ContactCreateRequest);
+
+      // Upload photo if one was selected
+      if (pendingPhoto) {
+        await uploadPhoto.mutateAsync({ id: contact.id, file: pendingPhoto });
+      }
+
       navigate('/kanban');
     },
-    [createContact, navigate]
+    [createContact, uploadPhoto, pendingPhoto, navigate]
   );
 
   return (
@@ -40,7 +53,8 @@ export function AddContactPage(): ReactNode {
         <ContactForm
           onSubmit={handleSubmit}
           onCancel={() => { navigate(-1); }}
-          isSubmitting={createContact.isPending}
+          onPhotoUpload={handlePhotoUpload}
+          isSubmitting={createContact.isPending || uploadPhoto.isPending}
         />
       </div>
     </Layout>

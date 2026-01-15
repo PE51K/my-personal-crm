@@ -69,11 +69,13 @@ class ContactAssociationBrief(BaseModel):
     Attributes:
         id: Contact unique identifier.
         first_name: Contact's first name.
+        middle_name: Contact's middle name (optional).
         last_name: Contact's last name (optional).
     """
 
     id: str
     first_name: str
+    middle_name: str | None = None
     last_name: str | None = None
 
 
@@ -202,7 +204,6 @@ class ContactResponse(BaseModel):
         interests: Associated interests.
         occupations: Associated occupations.
         associations: Associated contacts.
-        cluster_id: Cluster ID for graph grouping.
         sort_order_in_status: Sort order within status column.
         created_at: When the contact was created.
         updated_at: When the contact was last updated.
@@ -225,7 +226,6 @@ class ContactResponse(BaseModel):
     interests: list[InterestBase] = Field(default_factory=list)
     occupations: list[OccupationBase] = Field(default_factory=list)
     associations: list[ContactAssociationBrief] = Field(default_factory=list)
-    cluster_id: int | None = None
     sort_order_in_status: int = 0
     created_at: datetime
     updated_at: datetime
@@ -237,6 +237,7 @@ class ContactListItem(BaseModel):
     Attributes:
         id: Contact unique identifier.
         first_name: Contact's first name.
+        middle_name: Contact's middle name.
         last_name: Contact's last name.
         status: Status details.
         photo_url: Signed URL for photo.
@@ -246,6 +247,7 @@ class ContactListItem(BaseModel):
 
     id: str
     first_name: str
+    middle_name: str | None = None
     last_name: str | None = None
     status: StatusBase | None = None
     photo_url: str | None = None

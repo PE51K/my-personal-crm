@@ -9,7 +9,9 @@ import {
   getOccupationSuggestions,
   getTagSuggestions,
 } from '@/services/suggestions';
+import { getContacts } from '@/services/contacts';
 import { useStatuses } from './useStatuses';
+import type { ContactAssociationBrief } from '@/types';
 
 /**
  * Query key factory for suggestions
@@ -76,6 +78,37 @@ export function useStatusSuggestions(query: string) {
 
   return {
     data: filteredStatuses,
+    isLoading,
+  };
+}
+
+/**
+ * Hook to fetch contact suggestions for associations
+ */
+export function useContactSuggestions(query: string, excludeIds: string[] = [], limit = 10) {
+  const { data: contactsResponse, isLoading } = useQuery({
+    queryKey: [...suggestionKeys.all, 'contacts', query],
+    queryFn: () => getContacts({ search: query, page_size: limit + excludeIds.length }),
+    enabled: query.length >= 1,
+    staleTime: 30 * 1000,
+  });
+
+  const suggestions = useMemo(() => {
+    if (!contactsResponse?.data) return [];
+
+    return contactsResponse.data
+      .filter((c) => !excludeIds.includes(c.id))
+      .slice(0, limit)
+      .map((c): ContactAssociationBrief => ({
+        id: c.id,
+        first_name: c.first_name,
+        middle_name: c.middle_name,
+        last_name: c.last_name,
+      }));
+  }, [contactsResponse, excludeIds, limit]);
+
+  return {
+    data: suggestions,
     isLoading,
   };
 }

@@ -6,7 +6,6 @@
 interface EnvConfig {
   apiBaseUrl: string;
   enableGraphView: boolean;
-  enableClustering: boolean;
 }
 
 function getEnvVar(key: string, defaultValue?: string): string {
@@ -31,5 +30,4 @@ function getBoolEnvVar(key: string, defaultValue: boolean): boolean {
 export const env: EnvConfig = {
   apiBaseUrl: getEnvVar('VITE_API_BASE_URL', '/api'),
   enableGraphView: getBoolEnvVar('VITE_ENABLE_GRAPH_VIEW', true),
-  enableClustering: getBoolEnvVar('VITE_ENABLE_CLUSTERING', true),
 };

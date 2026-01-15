@@ -52,6 +52,7 @@ export interface StatusFull extends Status {
 export interface ContactAssociationBrief {
   id: string;
   first_name: string;
+  middle_name?: string | null;
   last_name: string | null;
 }
 
@@ -132,7 +133,6 @@ export interface Contact {
   interests: Interest[];
   occupations: Occupation[];
   associations: ContactAssociationBrief[];
-  cluster_id: number | null;
   sort_order_in_status: number;
   created_at: string;
   updated_at: string;
@@ -144,6 +144,7 @@ export interface Contact {
 export interface ContactListItem {
   id: string;
   first_name: string;
+  middle_name: string | null;
   last_name: string | null;
   status: Status | null;
   photo_url: string | null;
@@ -181,7 +182,6 @@ export interface ContactListParams {
   created_at_to?: string;
   met_at_from?: string;
   met_at_to?: string;
-  cluster_id?: number;
   search?: string;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';

@@ -37,7 +37,7 @@ export function KanbanCard({ contact, onClick }: KanbanCardProps): ReactNode {
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const fullName = [contact.first_name, contact.last_name]
+  const fullName = [contact.first_name, contact.middle_name, contact.last_name]
     .filter(Boolean)
     .join(' ');
 

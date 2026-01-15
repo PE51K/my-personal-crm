@@ -39,7 +39,6 @@ export async function getContacts(
         created_at_to: params.created_at_to,
         met_at_from: params.met_at_from,
         met_at_to: params.met_at_to,
-        cluster_id: params.cluster_id,
         search: params.search,
         sort_by: params.sort_by,
         sort_order: params.sort_order,

@@ -6,12 +6,10 @@ import { type ReactNode, useCallback, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { GraphView } from '@/components/graph/GraphView';
 import { PersonCard } from '@/components/contacts/PersonCard';
-import { Button } from '@/components/ui/Button';
 import {
   useGraph,
   useCreateEdge,
   useDeleteEdge,
-  useRecomputeClusters,
 } from '@/hooks/useGraph';
 import type { GraphNode } from '@/types';
 
@@ -20,7 +18,6 @@ export function GraphPage(): ReactNode {
   const { data, isLoading } = useGraph();
   const createEdge = useCreateEdge();
   const deleteEdge = useDeleteEdge();
-  const recomputeClusters = useRecomputeClusters();
 
   const handleNodeClick = useCallback((node: GraphNode) => {
     setSelectedNodeId(node.id);
@@ -43,10 +40,6 @@ export function GraphPage(): ReactNode {
     [deleteEdge]
   );
 
-  const handleRecomputeClusters = useCallback(() => {
-    recomputeClusters.mutate();
-  }, [recomputeClusters]);
-
   return (
     <Layout>
       <div className="flex flex-col h-[calc(100vh-4rem)]">
@@ -56,15 +49,6 @@ export function GraphPage(): ReactNode {
             <p className="mt-2 text-gray-600">
               Visualize relationships between contacts
             </p>
-          </div>
-          <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              onClick={handleRecomputeClusters}
-              isLoading={recomputeClusters.isPending}
-            >
-              Recompute Clusters
-            </Button>
           </div>
         </div>
 

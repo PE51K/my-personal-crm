@@ -6,7 +6,6 @@ export interface GraphNode {
   first_name: string;
   last_name: string | null;
   photo_url: string | null;
-  cluster_id: number | null;
   position_x: number | null;
   position_y: number | null;
 }
@@ -22,21 +21,11 @@ export interface GraphEdge {
 }
 
 /**
- * Graph cluster
- */
-export interface GraphCluster {
-  id: number;
-  contact_count: number;
-  color: string;
-}
-
-/**
  * Full graph response
  */
 export interface GraphResponse {
   nodes: GraphNode[];
   edges: GraphEdge[];
-  clusters: GraphCluster[];
 }
 
 /**
@@ -57,13 +46,4 @@ export interface EdgeResponse {
   target_id: string;
   label: string | null;
   created_at: string;
-}
-
-/**
- * Cluster recompute response
- */
-export interface ClusterRecomputeResponse {
-  clusters_found: number;
-  contacts_updated: number;
-  algorithm: string;
 }

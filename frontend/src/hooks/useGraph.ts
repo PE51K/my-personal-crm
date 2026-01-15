@@ -7,9 +7,11 @@ import {
   createEdge,
   deleteEdge,
   getGraph,
-  recomputeClusters,
 } from '@/services/graph';
-import type { EdgeCreateRequest, GraphResponse } from '@/types';
+import type {
+  EdgeCreateRequest,
+  GraphResponse,
+} from '@/types';
 import { contactKeys } from './useContacts';
 
 /**
@@ -81,22 +83,6 @@ export function useDeleteEdge() {
       });
       // Invalidate contacts
       void queryClient.invalidateQueries({ queryKey: contactKeys.details() });
-    },
-  });
-}
-
-/**
- * Hook to recompute clusters
- */
-export function useRecomputeClusters() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: recomputeClusters,
-    onSuccess: () => {
-      // Invalidate graph and contacts to refresh cluster data
-      void queryClient.invalidateQueries({ queryKey: graphKeys.all });
-      void queryClient.invalidateQueries({ queryKey: contactKeys.all });
     },
   });
 }

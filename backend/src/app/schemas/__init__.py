@@ -26,10 +26,8 @@ from app.schemas.contact import (
     TagWithCount,
 )
 from app.schemas.graph import (
-    ClusterRecomputeResponse,
     EdgeCreateRequest,
     EdgeResponse,
-    GraphCluster,
     GraphEdge,
     GraphNode,
     GraphResponse,
@@ -55,7 +53,6 @@ __all__ = [
     "AuthTokenResponse",
     "BootstrapRequest",
     "BootstrapStatusResponse",
-    "ClusterRecomputeResponse",
     "ContactAssociationBrief",
     "ContactCreateRequest",
     "ContactListItem",
@@ -64,7 +61,6 @@ __all__ = [
     "ContactUpdateRequest",
     "EdgeCreateRequest",
     "EdgeResponse",
-    "GraphCluster",
     "GraphEdge",
     "GraphNode",
     "GraphResponse",
