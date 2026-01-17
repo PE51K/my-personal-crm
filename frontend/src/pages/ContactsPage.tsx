@@ -8,8 +8,8 @@ import { ContactCard } from '@/components/contacts/ContactCard';
 import { PersonCard } from '@/components/contacts/PersonCard';
 import { FilterPanel } from '@/components/kanban/FilterPanel';
 import { Button } from '@/components/ui/Button';
-import { Spinner } from '@/components/ui/Spinner';
 import { Input } from '@/components/ui/Input';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { useContacts } from '@/hooks/useContacts';
 import type { ContactListItem, ContactListParams } from '@/types';
 
@@ -59,12 +59,13 @@ export function ContactsPage(): ReactNode {
         </div>
 
         {/* Search Bar */}
-        <div className="max-w-md">
+        <div className="max-w-xl">
           <Input
             type="text"
-            placeholder="Search contacts..."
+            placeholder="Search contacts by name, email, or company..."
             value={searchQuery}
             onChange={(e) => { handleSearchChange(e.target.value); }}
+            className="h-12 text-base"
             leftIcon={
               <svg
                 className="w-5 h-5 text-gray-400"
@@ -99,30 +100,48 @@ export function ContactsPage(): ReactNode {
 
         {/* Contacts List */}
         {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <Spinner size="lg" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <SkeletonList count={6} />
           </div>
         ) : contacts.length === 0 ? (
-          <div className="text-center py-12">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-              />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No contacts found</h3>
-            <p className="mt-1 text-sm text-gray-500">
+          <div className="text-center py-16 px-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 mb-6">
+              <svg
+                className="h-8 w-8 text-primary-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
               {searchQuery || Object.keys(filters).length > 0
-                ? 'Try adjusting your search or filters'
-                : 'Get started by adding a new contact'}
+                ? 'No contacts found'
+                : 'Your network awaits'}
+            </h3>
+            <p className="text-base text-gray-600 mb-6 max-w-md mx-auto">
+              {searchQuery || Object.keys(filters).length > 0
+                ? 'Try adjusting your search or filters to find what you\'re looking for'
+                : 'Start building your professional network by adding your first contact'}
             </p>
+            {!(searchQuery || Object.keys(filters).length > 0) && (
+              <Button 
+                onClick={() => { window.location.href = '/contacts/add'; }}
+                leftIcon={
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                }
+              >
+                Add Your First Contact
+              </Button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

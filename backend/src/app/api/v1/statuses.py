@@ -4,6 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import delete, func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import CurrentOwner, DBSession
@@ -106,6 +107,9 @@ async def create_status(
 
     Returns:
         Created status.
+    
+    Raises:
+        HTTPException: If a status with the same name already exists.
     """
     # Get max sort_order
     max_order_result = await db.execute(
@@ -121,8 +125,16 @@ async def create_status(
         is_active=request.is_active if request.is_active is not None else True,
     )
     db.add(new_status)
-    await db.commit()
-    await db.refresh(new_status)
+    
+    try:
+        await db.commit()
+        await db.refresh(new_status)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Status with name '{request.name}' already exists",
+        )
 
     return StatusResponse(
         id=str(new_status.id),
@@ -165,6 +177,7 @@ async def update_status(
 
     Raises:
         StatusNotFoundError: If status doesn't exist.
+        HTTPException: If trying to rename to an existing status name.
     """
     # Check status exists
     result = await db.execute(
@@ -180,8 +193,15 @@ async def update_status(
     if request.is_active is not None:
         status_obj.is_active = request.is_active
 
-    await db.commit()
-    await db.refresh(status_obj)
+    try:
+        await db.commit()
+        await db.refresh(status_obj)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Status with name '{request.name}' already exists",
+        )
 
     # Get contact count
     count_result = await db.execute(

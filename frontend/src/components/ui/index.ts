@@ -11,4 +11,5 @@ export * from './Textarea';
 export * from './Badge';
 export * from './Avatar';
 export * from './Spinner';
+export * from './Skeleton';
 export * from './Autocomplete';

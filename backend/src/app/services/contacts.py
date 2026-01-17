@@ -175,16 +175,13 @@ async def _build_contact_response(
 
     Args:
         db: Database session instance.
-        contact: Contact model instance.
+        contact: Contact model instance (with relationships already eagerly loaded).
 
     Returns:
         Full ContactResponse with all related data.
     """
-    # Ensure all relationships are loaded
-    await db.refresh(
-        contact,
-        ["status", "tags", "interests", "occupations", "source_associations", "target_associations"]
-    )
+    # Note: Relationships should already be eagerly loaded via selectinload
+    # in the calling function (get_contact, create_contact, update_contact)
 
     # Build status
     status = None
@@ -200,12 +197,11 @@ async def _build_contact_response(
     # Build occupations
     occupations = [OccupationBase(id=str(occ.id), name=occ.name) for occ in contact.occupations]
 
-    # Build associations (load related contacts)
+    # Build associations (relationships already eagerly loaded via selectinload)
     associations = []
     seen_ids = set()
 
     for assoc in contact.source_associations:
-        await db.refresh(assoc, ["target_contact"])
         target = assoc.target_contact
         if target.id not in seen_ids:
             associations.append(
@@ -219,14 +215,13 @@ async def _build_contact_response(
             seen_ids.add(target.id)
 
     for assoc in contact.target_associations:
-        await db.refresh(assoc, ["source_contact"])
         source = assoc.source_contact
         if source.id not in seen_ids:
             associations.append(
                 ContactAssociationBrief(
                     id=str(source.id),
                     first_name=source.first_name,
-                    middle_name=source.middle_name,
+                    middle_name=source.first_name,
                     last_name=source.last_name,
                 )
             )
@@ -361,7 +356,8 @@ async def create_contact(
             db.add(association)
 
     await db.flush()
-    return await _build_contact_response(db, contact)
+    # Re-fetch the contact with all relationships eagerly loaded
+    return await get_contact(db, str(contact.id))
 
 
 async def get_contact(

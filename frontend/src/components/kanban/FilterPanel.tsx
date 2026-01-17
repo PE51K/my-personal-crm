@@ -104,12 +104,12 @@ export function FilterPanel({
     selectedOccupations.length > 0;
 
   return (
-    <Card className="w-full">
-      <div className="space-y-4">
+    <Card className="w-full animate-slide-down">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
           {hasActiveFilters && (
-            <Button variant="secondary" size="sm" onClick={handleClearFilters}>
+            <Button variant="tertiary" size="sm" onClick={handleClearFilters}>
               Clear All
             </Button>
           )}
@@ -127,40 +127,46 @@ export function FilterPanel({
         </div>
 
         {/* Date Ranges */}
-        <div className="grid grid-cols-2 gap-3">
-          <Input
-            label="Created From"
-            type="date"
-            value={createdFrom}
-            onChange={(e) => { setCreatedFrom(e.target.value); }}
-          />
-          <Input
-            label="Created To"
-            type="date"
-            value={createdTo}
-            onChange={(e) => { setCreatedTo(e.target.value); }}
-          />
+        <div className="space-y-4">
+          <h4 className="text-sm font-medium text-gray-700">Date Range</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Created From"
+              type="date"
+              value={createdFrom}
+              onChange={(e) => { setCreatedFrom(e.target.value); }}
+            />
+            <Input
+              label="Created To"
+              type="date"
+              value={createdTo}
+              onChange={(e) => { setCreatedTo(e.target.value); }}
+            />
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Input
-            label="Met From"
-            type="date"
-            value={metFrom}
-            onChange={(e) => { setMetFrom(e.target.value); }}
-          />
-          <Input
-            label="Met To"
-            type="date"
-            value={metTo}
-            onChange={(e) => { setMetTo(e.target.value); }}
-          />
+        <div className="space-y-4">
+          <h4 className="text-sm font-medium text-gray-700">Met Date Range</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Met From"
+              type="date"
+              value={metFrom}
+              onChange={(e) => { setMetFrom(e.target.value); }}
+            />
+            <Input
+              label="Met To"
+              type="date"
+              value={metTo}
+              onChange={(e) => { setMetTo(e.target.value); }}
+            />
+          </div>
         </div>
 
         {/* Tags */}
         {tags.length > 0 && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
               Tags
             </label>
             <div className="flex flex-wrap gap-2">
@@ -168,7 +174,7 @@ export function FilterPanel({
                 <Badge
                   key={tag.id}
                   variant={selectedTags.includes(tag.id) ? 'primary' : 'default'}
-                  className="cursor-pointer"
+                  className="cursor-pointer transition-all duration-150"
                   onClick={() => { handleToggleTag(tag.id); }}
                 >
                   {tag.name}
@@ -181,7 +187,7 @@ export function FilterPanel({
         {/* Interests */}
         {interests.length > 0 && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
               Interests
             </label>
             <div className="flex flex-wrap gap-2">
@@ -191,7 +197,7 @@ export function FilterPanel({
                   variant={
                     selectedInterests.includes(interest.id) ? 'primary' : 'default'
                   }
-                  className="cursor-pointer"
+                  className="cursor-pointer transition-all duration-150"
                   onClick={() => { handleToggleInterest(interest.id); }}
                 >
                   {interest.name}
@@ -204,7 +210,7 @@ export function FilterPanel({
         {/* Occupations */}
         {occupations.length > 0 && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
               Occupations
             </label>
             <div className="flex flex-wrap gap-2">
@@ -216,7 +222,7 @@ export function FilterPanel({
                       ? 'primary'
                       : 'default'
                   }
-                  className="cursor-pointer"
+                  className="cursor-pointer transition-all duration-150"
                   onClick={() => { handleToggleOccupation(occupation.id); }}
                 >
                   {occupation.name}

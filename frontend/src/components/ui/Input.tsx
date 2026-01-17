@@ -29,10 +29,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
 
     const baseInputStyles =
-      'block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed';
+      'block w-full h-10 px-3 rounded-md border-1.5 border-gray-300 shadow-sm transition-all duration-150 ' +
+      'hover:border-gray-400 hover:shadow-sm ' +
+      'focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-none ' +
+      'placeholder:text-gray-400 text-gray-900 text-sm ' +
+      'disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500';
 
     const errorInputStyles =
-      'border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500';
+      'border-red-500 hover:border-red-600 focus:border-red-500 focus:ring-2 focus:ring-red-100 ' +
+      'text-red-900 placeholder-red-300';
 
     const iconPaddingLeft = leftIcon ? 'pl-10' : '';
     const iconPaddingRight = rightIcon ? 'pr-10' : '';
@@ -42,7 +47,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-gray-700 mb-2"
           >
             {label}
           </label>
@@ -70,14 +75,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {error && (
           <p
             id={`${inputId}-error`}
-            className="mt-1 text-sm text-red-600"
+            className="mt-2 text-sm text-red-600"
             role="alert"
           >
             {error}
           </p>
         )}
         {helperText && !error && (
-          <p className="mt-1 text-sm text-gray-500">{helperText}</p>
+          <p className="mt-2 text-sm text-gray-500">{helperText}</p>
         )}
       </div>
     );

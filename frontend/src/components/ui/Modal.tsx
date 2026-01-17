@@ -86,7 +86,7 @@ export function Modal({
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-fade-in"
       onClick={handleOverlayClick}
       onKeyDown={handleKeyDown}
       role="dialog"
@@ -95,7 +95,7 @@ export function Modal({
     >
       <div
         ref={modalRef}
-        className={`relative bg-white rounded-lg shadow-xl w-full ${sizeStyles[size]} max-h-[90vh] overflow-hidden flex flex-col`}
+        className={`relative bg-white rounded-lg shadow-modal w-full ${sizeStyles[size]} max-h-[90vh] overflow-hidden flex flex-col animate-scale-in`}
         tabIndex={-1}
       >
         {/* Header */}
@@ -110,7 +110,7 @@ export function Modal({
               <button
                 type="button"
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded-md p-1"
+                className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded-md p-1 transition-colors duration-150"
                 aria-label="Close modal"
               >
                 <svg

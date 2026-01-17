@@ -36,27 +36,27 @@ function getInitials(name?: string): string {
 }
 
 function getBackgroundColor(name?: string): string {
-  if (!name) return 'bg-gray-400';
+  if (!name) return 'bg-gradient-to-br from-gray-400 to-gray-500';
 
-  // Generate a consistent color based on the name
-  const colors = [
-    'bg-red-500',
-    'bg-orange-500',
-    'bg-amber-500',
-    'bg-yellow-500',
-    'bg-lime-500',
-    'bg-green-500',
-    'bg-emerald-500',
-    'bg-teal-500',
-    'bg-cyan-500',
-    'bg-sky-500',
-    'bg-blue-500',
-    'bg-indigo-500',
-    'bg-violet-500',
-    'bg-purple-500',
-    'bg-fuchsia-500',
-    'bg-pink-500',
-    'bg-rose-500',
+  // Generate a consistent gradient color based on the name
+  const gradients = [
+    'bg-gradient-to-br from-red-400 to-red-600',
+    'bg-gradient-to-br from-orange-400 to-orange-600',
+    'bg-gradient-to-br from-amber-400 to-amber-600',
+    'bg-gradient-to-br from-yellow-400 to-yellow-600',
+    'bg-gradient-to-br from-lime-400 to-lime-600',
+    'bg-gradient-to-br from-green-400 to-green-600',
+    'bg-gradient-to-br from-emerald-400 to-emerald-600',
+    'bg-gradient-to-br from-teal-400 to-teal-600',
+    'bg-gradient-to-br from-cyan-400 to-cyan-600',
+    'bg-gradient-to-br from-sky-400 to-sky-600',
+    'bg-gradient-to-br from-blue-400 to-blue-600',
+    'bg-gradient-to-br from-indigo-400 to-indigo-600',
+    'bg-gradient-to-br from-violet-400 to-violet-600',
+    'bg-gradient-to-br from-purple-400 to-purple-600',
+    'bg-gradient-to-br from-fuchsia-400 to-fuchsia-600',
+    'bg-gradient-to-br from-pink-400 to-pink-600',
+    'bg-gradient-to-br from-rose-400 to-rose-600',
   ];
 
   let hash = 0;
@@ -64,8 +64,8 @@ function getBackgroundColor(name?: string): string {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
 
-  const index = Math.abs(hash) % colors.length;
-  return colors[index] ?? 'bg-gray-400';
+  const index = Math.abs(hash) % gradients.length;
+  return gradients[index] ?? 'bg-gradient-to-br from-gray-400 to-gray-500';
 }
 
 export function Avatar({
@@ -86,7 +86,7 @@ export function Avatar({
 
   return (
     <div
-      className={`relative inline-flex items-center justify-center rounded-full overflow-hidden ${styles.container} ${className}`}
+      className={`relative inline-flex items-center justify-center rounded-full overflow-hidden ring-2 ring-white ring-offset-1 ${styles.container} ${className}`}
     >
       {showImage ? (
         <img
@@ -97,7 +97,7 @@ export function Avatar({
         />
       ) : (
         <div
-          className={`w-full h-full flex items-center justify-center text-white font-medium ${getBackgroundColor(name)} ${styles.text}`}
+          className={`w-full h-full flex items-center justify-center text-white font-semibold ${getBackgroundColor(name)} ${styles.text}`}
         >
           {getInitials(name)}
         </div>

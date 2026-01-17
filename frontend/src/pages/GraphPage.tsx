@@ -43,16 +43,16 @@ export function GraphPage(): ReactNode {
   return (
     <Layout>
       <div className="flex flex-col h-[calc(100vh-4rem)]">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Network Graph</h1>
-            <p className="mt-2 text-gray-600">
+            <p className="mt-2 text-base text-gray-600 opacity-80">
               Visualize relationships between contacts
             </p>
           </div>
         </div>
 
-        <div className="flex-1 bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
+        <div className="flex-1 bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg border-2 border-gray-700 overflow-hidden shadow-lg">
           <GraphView
             data={data}
             isLoading={isLoading}

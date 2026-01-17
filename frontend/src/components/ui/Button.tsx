@@ -4,7 +4,7 @@
 
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'danger' | 'ghost';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -18,19 +18,21 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 disabled:bg-primary-300',
+    'bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 focus:ring-primary-500 disabled:bg-primary-300 font-semibold shadow-sm hover:shadow transition-all duration-150',
   secondary:
-    'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-primary-500 disabled:bg-gray-100',
+    'bg-white text-gray-700 border-1.5 border-gray-300 hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 transition-all duration-150',
+  tertiary:
+    'bg-transparent text-gray-700 hover:text-gray-900 hover:underline focus:ring-primary-500 disabled:text-gray-400 transition-all duration-150',
   danger:
-    'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 disabled:bg-red-300',
+    'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 focus:ring-red-500 disabled:bg-red-300 font-semibold shadow-sm hover:shadow transition-all duration-150',
   ghost:
-    'bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-primary-500 disabled:text-gray-400',
+    'bg-transparent text-gray-700 hover:bg-gray-100 active:bg-gray-200 focus:ring-primary-500 disabled:text-gray-400 transition-all duration-150',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'px-3 py-1.5 text-sm',
-  md: 'px-4 py-2 text-sm',
-  lg: 'px-6 py-3 text-base',
+  sm: 'px-3 py-1.5 text-sm h-8',
+  md: 'px-4 py-2 text-sm h-10',
+  lg: 'px-6 py-3 text-base h-12',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -49,7 +51,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseStyles =
-      'inline-flex items-center justify-center font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed';
+      'inline-flex items-center justify-center rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed';
 
     return (
       <button

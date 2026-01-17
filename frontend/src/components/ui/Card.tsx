@@ -9,6 +9,7 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
   padding?: 'none' | 'sm' | 'md' | 'lg';
   shadow?: 'none' | 'sm' | 'md' | 'lg';
   hover?: boolean;
+  interactive?: boolean;
 }
 
 const paddingStyles: Record<CardProps['padding'] & string, string> = {
@@ -20,8 +21,8 @@ const paddingStyles: Record<CardProps['padding'] & string, string> = {
 
 const shadowStyles: Record<CardProps['shadow'] & string, string> = {
   none: '',
-  sm: 'shadow-sm',
-  md: 'shadow',
+  sm: 'shadow-card',
+  md: 'shadow-md',
   lg: 'shadow-lg',
 };
 
@@ -32,14 +33,15 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       padding = 'md',
       shadow = 'sm',
       hover = false,
+      interactive = false,
       className = '',
       ...props
     },
     ref
   ) => {
     const baseStyles = 'bg-white rounded-lg border border-gray-200';
-    const hoverStyles = hover
-      ? 'transition-shadow hover:shadow-md cursor-pointer'
+    const hoverStyles = hover || interactive
+      ? 'transition-all duration-200 hover:shadow-card-hover hover:-translate-y-0.5 cursor-pointer'
       : '';
 
     return (
@@ -75,8 +77,8 @@ export function CardHeader({
   return (
     <div className={`flex items-start justify-between ${className}`}>
       <div>
-        <h3 className="text-lg font-medium text-gray-900">{title}</h3>
-        {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
+        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+        {subtitle && <p className="mt-1 text-sm text-gray-600">{subtitle}</p>}
       </div>
       {action && <div>{action}</div>}
     </div>

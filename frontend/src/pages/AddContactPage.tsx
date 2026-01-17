@@ -37,16 +37,16 @@ export function AddContactPage(): ReactNode {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-8 max-w-4xl">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Add Contact</h1>
-            <p className="mt-2 text-gray-600">
+            <p className="mt-2 text-base text-gray-600 opacity-80">
               Create a new contact in your network
             </p>
           </div>
           <Button variant="secondary" onClick={() => { navigate(-1); }}>
-            Back
+            ← Back
           </Button>
         </div>
 
