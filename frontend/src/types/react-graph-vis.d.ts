@@ -1,18 +1,31 @@
 declare module 'react-graph-vis' {
   import { Component } from 'react';
 
+  export interface NodeColor {
+    background?: string;
+    border?: string;
+    highlight?: { background?: string; border?: string };
+    hover?: { background?: string; border?: string };
+  }
+
+  export interface NodeFont {
+    color?: string;
+    size?: number;
+    face?: string;
+  }
+
   export interface Node {
     id: string | number;
     label?: string;
     title?: string;
-    color?: any;
+    color?: string | NodeColor;
     shape?: string;
     image?: string | undefined;
     size?: number;
-    font?: any;
+    font?: NodeFont;
     borderWidth?: number;
     borderWidthSelected?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   }
 
   export interface Edge {
@@ -20,11 +33,11 @@ declare module 'react-graph-vis' {
     from: string | number;
     to: string | number;
     label?: string;
-    smooth?: boolean | any;
-    color?: any;
+    smooth?: boolean | { type?: string; roundness?: number };
+    color?: string | { color?: string; highlight?: string; hover?: string };
     width?: number;
-    font?: any;
-    [key: string]: any;
+    font?: NodeFont;
+    [key: string]: unknown;
   }
 
   export interface GraphData {
@@ -33,18 +46,18 @@ declare module 'react-graph-vis' {
   }
 
   export interface GraphEvents {
-    [key: string]: (params?: any) => void;
+    [key: string]: (params?: unknown) => void;
   }
 
   export interface GraphOptions {
-    [key: string]: any;
+    [key: string]: unknown;
   }
 
   interface GraphProps {
     graph: GraphData;
     options?: GraphOptions;
     events?: GraphEvents;
-    getNetwork?: (network: any) => void;
+    getNetwork?: (network: unknown) => void;
     style?: React.CSSProperties;
   }
 

@@ -10,8 +10,8 @@ from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
 from app.core.settings import get_settings
-from app.utils.errors import APIError
 from app.db.migrations import initialize_app
+from app.utils.errors import APIError
 
 # Configure logging
 logging.basicConfig(
@@ -40,8 +40,8 @@ async def lifespan(app: FastAPI):  # noqa: ANN201
     # Initialize database and storage
     try:
         await initialize_app(settings)
-    except Exception as e:
-        logger.error("Failed to initialize application: %s", e)
+    except Exception:
+        logger.exception("Failed to initialize application")
         raise
 
     yield

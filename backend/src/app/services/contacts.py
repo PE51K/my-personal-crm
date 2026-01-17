@@ -3,7 +3,6 @@
 import logging
 import math
 from datetime import date
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy import delete as sql_delete
@@ -11,8 +10,6 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.utils.errors import ContactNotFoundError, StatusNotFoundError
-from app.services.storage import get_file_url
 from app.models import (
     Contact,
     ContactAssociation,
@@ -36,6 +33,8 @@ from app.schemas.contact import (
     TagBase,
     TagInput,
 )
+from app.services.storage import get_file_url
+from app.utils.errors import ContactNotFoundError, StatusNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -71,17 +70,16 @@ async def _process_tags(
                 logger.warning("Received temp tag ID without name: %s", tag_input)
                 continue
             tag_ids.append(UUID(tag_input))
+        # TagInput object
+        elif _is_temp_id(tag_input.id):
+            # Create new tag
+            new_tag = Tag(name=tag_input.name)
+            db.add(new_tag)
+            await db.flush()
+            tag_ids.append(new_tag.id)
         else:
-            # TagInput object
-            if _is_temp_id(tag_input.id):
-                # Create new tag
-                new_tag = Tag(name=tag_input.name)
-                db.add(new_tag)
-                await db.flush()
-                tag_ids.append(new_tag.id)
-            else:
-                # Use existing tag ID
-                tag_ids.append(UUID(tag_input.id))
+            # Use existing tag ID
+            tag_ids.append(UUID(tag_input.id))
 
     return tag_ids
 
@@ -112,17 +110,16 @@ async def _process_interests(
                 logger.warning("Received temp interest ID without name: %s", interest_input)
                 continue
             interest_ids.append(UUID(interest_input))
+        # InterestInput object
+        elif _is_temp_id(interest_input.id):
+            # Create new interest
+            new_interest = Interest(name=interest_input.name)
+            db.add(new_interest)
+            await db.flush()
+            interest_ids.append(new_interest.id)
         else:
-            # InterestInput object
-            if _is_temp_id(interest_input.id):
-                # Create new interest
-                new_interest = Interest(name=interest_input.name)
-                db.add(new_interest)
-                await db.flush()
-                interest_ids.append(new_interest.id)
-            else:
-                # Use existing interest ID
-                interest_ids.append(UUID(interest_input.id))
+            # Use existing interest ID
+            interest_ids.append(UUID(interest_input.id))
 
     return interest_ids
 
@@ -153,17 +150,16 @@ async def _process_occupations(
                 logger.warning("Received temp occupation ID without name: %s", occupation_input)
                 continue
             occupation_ids.append(UUID(occupation_input))
+        # OccupationInput object
+        elif _is_temp_id(occupation_input.id):
+            # Create new occupation
+            new_occupation = Occupation(name=occupation_input.name)
+            db.add(new_occupation)
+            await db.flush()
+            occupation_ids.append(new_occupation.id)
         else:
-            # OccupationInput object
-            if _is_temp_id(occupation_input.id):
-                # Create new occupation
-                new_occupation = Occupation(name=occupation_input.name)
-                db.add(new_occupation)
-                await db.flush()
-                occupation_ids.append(new_occupation.id)
-            else:
-                # Use existing occupation ID
-                occupation_ids.append(UUID(occupation_input.id))
+            # Use existing occupation ID
+            occupation_ids.append(UUID(occupation_input.id))
 
     return occupation_ids
 
@@ -199,23 +195,23 @@ async def _process_status(
         if not result.scalar_one_or_none():
             raise StatusNotFoundError(status_input)
         return UUID(status_input)
-    else:
-        # StatusInput object
-        if _is_temp_id(status_input.id):
-            # Create new status
-            # Get max sort_order to place new status at the end
-            result = await db.execute(select(func.max(Status.sort_order)))
-            max_sort_order = result.scalar() or 0
-            new_status = Status(name=status_input.name, sort_order=max_sort_order + 1, is_active=True)
-            db.add(new_status)
-            await db.flush()
-            return new_status.id
-        else:
-            # Validate that status exists
-            result = await db.execute(select(Status).where(Status.id == UUID(status_input.id)))
-            if not result.scalar_one_or_none():
-                raise StatusNotFoundError(status_input.id)
-            return UUID(status_input.id)
+    # StatusInput object
+    if _is_temp_id(status_input.id):
+        # Create new status
+        # Get max sort_order to place new status at the end
+        result = await db.execute(select(func.max(Status.sort_order)))
+        max_sort_order = result.scalar() or 0
+        new_status = Status(
+            name=status_input.name, sort_order=max_sort_order + 1, is_active=True
+        )
+        db.add(new_status)
+        await db.flush()
+        return new_status.id
+    # Validate that status exists
+    result = await db.execute(select(Status).where(Status.id == UUID(status_input.id)))
+    if not result.scalar_one_or_none():
+        raise StatusNotFoundError(status_input.id)
+    return UUID(status_input.id)
 
 
 async def _build_contact_response(
@@ -243,7 +239,9 @@ async def _build_contact_response(
     tags = [TagBase(id=str(tag.id), name=tag.name) for tag in contact.tags]
 
     # Build interests
-    interests = [InterestBase(id=str(interest.id), name=interest.name) for interest in contact.interests]
+    interests = [
+        InterestBase(id=str(interest.id), name=interest.name) for interest in contact.interests
+    ]
 
     # Build occupations
     occupations = [OccupationBase(id=str(occ.id), name=occ.name) for occ in contact.occupations]
@@ -372,7 +370,7 @@ async def create_contact(
     )
     db.add(contact)
     await db.flush()
-    
+
     # Refresh contact to load lazy-loaded collections for async context
     await db.refresh(contact, attribute_names=["tags", "interests", "occupations"])
 
@@ -390,7 +388,9 @@ async def create_contact(
 
     # Load and associate occupations
     if processed_occupation_ids:
-        result = await db.execute(select(Occupation).where(Occupation.id.in_(processed_occupation_ids)))
+        result = await db.execute(
+            select(Occupation).where(Occupation.id.in_(processed_occupation_ids))
+        )
         occupations = result.scalars().all()
         contact.occupations.extend(occupations)
 
@@ -432,8 +432,12 @@ async def get_contact(
             selectinload(Contact.tags),
             selectinload(Contact.interests),
             selectinload(Contact.occupations),
-            selectinload(Contact.source_associations).selectinload(ContactAssociation.target_contact),
-            selectinload(Contact.target_associations).selectinload(ContactAssociation.source_contact),
+            selectinload(Contact.source_associations).selectinload(
+                ContactAssociation.target_contact
+            ),
+            selectinload(Contact.target_associations).selectinload(
+                ContactAssociation.source_contact
+            ),
         )
     )
     contact = result.scalar_one_or_none()
@@ -509,11 +513,13 @@ async def list_contacts(
         or_conditions = []
         for word in search_words:
             pattern = f"%{word}%"
-            or_conditions.extend([
-                Contact.first_name.ilike(pattern),
-                Contact.last_name.ilike(pattern),
-                Contact.middle_name.ilike(pattern),
-            ])
+            or_conditions.extend(
+                [
+                    Contact.first_name.ilike(pattern),
+                    Contact.last_name.ilike(pattern),
+                    Contact.middle_name.ilike(pattern),
+                ]
+            )
         query = query.where(or_(*or_conditions))
 
     # Get contact IDs filtered by tags/interests/occupations
@@ -766,7 +772,9 @@ async def update_contact(
         contact.interests.clear()
         # Load and add new interests
         if processed_interest_ids:
-            interest_result = await db.execute(select(Interest).where(Interest.id.in_(processed_interest_ids)))
+            interest_result = await db.execute(
+                select(Interest).where(Interest.id.in_(processed_interest_ids))
+            )
             interests = interest_result.scalars().all()
             contact.interests.extend(interests)
 
@@ -778,7 +786,9 @@ async def update_contact(
         contact.occupations.clear()
         # Load and add new occupations
         if processed_occupation_ids:
-            occupation_result = await db.execute(select(Occupation).where(Occupation.id.in_(processed_occupation_ids)))
+            occupation_result = await db.execute(
+                select(Occupation).where(Occupation.id.in_(processed_occupation_ids))
+            )
             occupations = occupation_result.scalars().all()
             contact.occupations.extend(occupations)
 

@@ -21,7 +21,9 @@ class AppOwner(Base):
     __table_args__ = (CheckConstraint("id = 1", name="app_owner_single_row"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
-    user_id: Mapped[uuid.UUID] = mapped_column("supabase_user_id", UUID(as_uuid=True), unique=True, nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        "supabase_user_id", UUID(as_uuid=True), unique=True, nullable=False
+    )
     email: Mapped[str] = mapped_column(Text, nullable=False)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)

@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
-from app.models.tables import contact_tags, contact_interests, contact_occupations
+from app.models.tables import contact_interests, contact_occupations, contact_tags
 
 if TYPE_CHECKING:
     from app.models.contact import Contact
@@ -46,7 +46,9 @@ class Interest(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
     # Relationships
-    contacts: Mapped[list["Contact"]] = relationship(secondary=contact_interests, back_populates="interests")
+    contacts: Mapped[list["Contact"]] = relationship(
+        secondary=contact_interests, back_populates="interests"
+    )
 
 
 class Occupation(Base):
@@ -63,4 +65,6 @@ class Occupation(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
     # Relationships
-    contacts: Mapped[list["Contact"]] = relationship(secondary=contact_occupations, back_populates="occupations")
+    contacts: Mapped[list["Contact"]] = relationship(
+        secondary=contact_occupations, back_populates="occupations"
+    )

@@ -172,6 +172,7 @@ class ContactCreateRequest(BaseModel):
             # Already a StatusInput instance
             return v
         return v
+
     tag_ids: list[str | TagInput] = Field(default_factory=list)
     interest_ids: list[str | InterestInput] = Field(default_factory=list)
     occupation_ids: list[str | OccupationInput] = Field(default_factory=list)
@@ -223,6 +224,7 @@ class ContactUpdateRequest(BaseModel):
             # Already a StatusInput instance
             return v
         return v
+
     interest_ids: list[str | InterestInput] | None = None
     occupation_ids: list[str | OccupationInput] | None = None
     association_contact_ids: list[str] | None = None

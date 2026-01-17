@@ -1,5 +1,4 @@
-"""
-Application settings for the Calculator API application.
+"""Application settings for the Calculator API application.
 
 Uses Pydantic's BaseSettings to manage configuration and environment variables.
 """
@@ -13,8 +12,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AppLoggingSettings(BaseSettings):
-    """
-    Settings for application logging.
+    """Settings for application logging.
 
     Attributes:
         level (str): Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
@@ -30,8 +28,7 @@ class AppLoggingSettings(BaseSettings):
 
 
 class AppCORSSettings(BaseSettings):
-    """
-    Settings for FastAPI application CORS configuration.
+    """Settings for FastAPI application CORS configuration.
 
     Attributes:
         origins (list[str]): List of allowed CORS origins.
@@ -53,8 +50,7 @@ class AppCORSSettings(BaseSettings):
 
 
 class AppSettings(BaseSettings):
-    """
-    Settings for FastAPI application.
+    """Settings for FastAPI application.
 
     Attributes:
         logging (AppLoggingSettings): Logging configuration settings.
@@ -69,8 +65,7 @@ class AppSettings(BaseSettings):
 
 
 class SecuritySettings(BaseSettings):
-    """
-    Settings for application security and authentication.
+    """Settings for application security and authentication.
 
     Attributes:
         jwt_secret_key (str): Secret key for JWT signing.
@@ -94,8 +89,7 @@ class SecuritySettings(BaseSettings):
 
 
 class DatabaseSettings(BaseSettings):
-    """
-    Settings for PostgreSQL database connection.
+    """Settings for PostgreSQL database connection.
 
     Attributes:
         host (str): PostgreSQL host.
@@ -119,8 +113,7 @@ class DatabaseSettings(BaseSettings):
 
     @property
     def url(self) -> str:
-        """
-        Construct PostgreSQL connection string from settings.
+        """Construct PostgreSQL connection string from settings.
 
         Returns:
             str: PostgreSQL connection URL.
@@ -129,8 +122,7 @@ class DatabaseSettings(BaseSettings):
 
     @property
     def async_url(self) -> str:
-        """
-        Construct async PostgreSQL connection string from settings.
+        """Construct async PostgreSQL connection string from settings.
 
         Returns:
             str: Async PostgreSQL connection URL for asyncpg.
@@ -142,8 +134,7 @@ class DatabaseSettings(BaseSettings):
 
 
 class S3Settings(BaseSettings):
-    """
-    Settings for S3/MinIO storage integration.
+    """Settings for S3/MinIO storage integration.
 
     Attributes:
         endpoint_url (str): S3/MinIO endpoint URL.
@@ -170,8 +161,7 @@ class S3Settings(BaseSettings):
 
 
 class YandexGPTSettings(BaseSettings):
-    """
-    Settings for Yandex GPT API integration.
+    """Settings for Yandex GPT API integration.
 
     Attributes:
         api_key (str): API key for Yandex GPT.
@@ -196,8 +186,7 @@ class YandexGPTSettings(BaseSettings):
 
     @property
     def model_name(self) -> str:
-        """
-        Get the model name for Yandex GPT in format of gpt://{folder_id}/{model}.
+        """Get the model name for Yandex GPT in format of gpt://{folder_id}/{model}.
 
         Returns:
             str: The model name for Yandex GPT.
@@ -206,8 +195,7 @@ class YandexGPTSettings(BaseSettings):
 
 
 class AISettings(BaseSettings):
-    """
-    Settings for AI-related configurations.
+    """Settings for AI-related configurations.
 
     Attributes:
         yandex_gpt (YandexGPTSettings): Settings for Yandex GPT integration.
@@ -220,8 +208,7 @@ class AISettings(BaseSettings):
 
 
 class AirflowSettings(BaseSettings):
-    """
-    Settings for Apache Airflow integration.
+    """Settings for Apache Airflow integration.
 
     Attributes:
         url (str): Airflow webserver URL.
@@ -244,8 +231,7 @@ class AirflowSettings(BaseSettings):
 
 
 class Settings(BaseSettings):
-    """
-    Main settings class that holds all application settings.
+    """Main settings class that holds all application settings.
 
     Attributes:
         app (AppSettings): Instance of AppSettings containing application server settings.
@@ -267,8 +253,7 @@ class Settings(BaseSettings):
 # Singleton instance of Settings
 @lru_cache
 def get_settings() -> Settings:
-    """
-    Get cached settings instance.
+    """Get cached settings instance.
 
     Returns:
         Settings: Cached settings instance with values from environment.
@@ -279,4 +264,4 @@ def get_settings() -> Settings:
 settings = get_settings()
 
 
-__all__ = ["settings", "get_settings", "Settings"]
+__all__ = ["Settings", "get_settings", "settings"]

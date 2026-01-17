@@ -65,7 +65,7 @@ export function useOccupationSuggestions(query: string, limit = 10) {
  */
 export function useStatusSuggestions(query: string) {
   const { data: statusesResponse, isLoading } = useStatuses(true); // Include inactive statuses
-  const statuses = statusesResponse?.data ?? [];
+  const statuses = useMemo(() => statusesResponse?.data ?? [], [statusesResponse?.data]);
 
   const filteredStatuses = useMemo(() => {
     if (!query.trim()) {

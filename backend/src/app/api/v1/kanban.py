@@ -4,13 +4,12 @@ from uuid import UUID
 
 from fastapi import APIRouter
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import CurrentOwner, DBSession
 from app.models.contact import Contact
 from app.models.status import Status
-from app.utils.errors import ContactNotFoundError, StatusNotFoundError
 from app.schemas.kanban import KanbanMoveRequest, KanbanMoveResponse
+from app.utils.errors import ContactNotFoundError, StatusNotFoundError
 
 router = APIRouter(prefix="/kanban", tags=["Kanban"])
 
@@ -50,17 +49,13 @@ async def move_contact(
         StatusNotFoundError: If status doesn't exist.
     """
     # Verify contact exists
-    contact_result = await db.execute(
-        select(Contact).where(Contact.id == UUID(request.contact_id))
-    )
+    contact_result = await db.execute(select(Contact).where(Contact.id == UUID(request.contact_id)))
     contact = contact_result.scalar_one_or_none()
     if not contact:
         raise ContactNotFoundError(request.contact_id)
 
     # Verify status exists
-    status_result = await db.execute(
-        select(Status).where(Status.id == UUID(request.status_id))
-    )
+    status_result = await db.execute(select(Status).where(Status.id == UUID(request.status_id)))
     if not status_result.scalar_one_or_none():
         raise StatusNotFoundError(request.status_id)
 

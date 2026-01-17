@@ -1,18 +1,11 @@
 """Contacts API endpoints."""
 
-from datetime import date, datetime, timedelta, timezone
+import contextlib
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, File, Query, UploadFile, status
-from fastapi.responses import FileResponse
 
 from app.api.dependencies import CurrentOwner, DBSession
-from app.utils.errors import PhotoNotFoundError
-from app.services.storage import (
-    delete_file,
-    file_exists,
-    get_file_url,
-    save_uploaded_file,
-)
 from app.schemas.contact import (
     ContactCreateRequest,
     ContactListResponse,
@@ -28,6 +21,12 @@ from app.services.contacts import (
     list_contacts,
     update_contact,
 )
+from app.services.storage import (
+    delete_file,
+    get_file_url,
+    save_uploaded_file,
+)
+from app.utils.errors import PhotoNotFoundError
 
 router = APIRouter(prefix="/contacts", tags=["Contacts"])
 
@@ -352,11 +351,9 @@ async def upload_photo_endpoint(
 
     # Delete old photo if exists
     if contact.photo_path:
-        try:
-            delete_file(contact.photo_path)
-        except Exception:
+        with contextlib.suppress(Exception):
             # Ignore deletion errors (file might not exist)
-            pass
+            delete_file(contact.photo_path)
 
     # Upload new photo (includes validation)
     photo_path = await save_uploaded_file(photo)
@@ -413,6 +410,6 @@ async def get_photo_url_endpoint(
     photo_url = get_file_url(contact.photo_path, expires_seconds=expires_seconds)
 
     # Calculate expiration timestamp
-    expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_seconds)
+    expires_at = datetime.now(UTC) + timedelta(seconds=expires_seconds)
 
     return PhotoUrlResponse(photo_url=photo_url, expires_at=expires_at)

@@ -7,6 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import get_settings
+from app.models import AppOwner
+from app.schemas.auth import AuthTokenResponse, UserResponse
 from app.utils.errors import (
     AuthAlreadyInitializedError,
     AuthInvalidCredentialsError,
@@ -18,8 +20,6 @@ from app.utils.security import (
     hash_password,
     verify_password,
 )
-from app.models import AppOwner
-from app.schemas.auth import AuthTokenResponse, UserResponse
 
 logger = logging.getLogger(__name__)
 
@@ -132,9 +132,7 @@ async def login_user(
 
     try:
         # Get owner by email
-        result = await db.execute(
-            select(AppOwner).where(AppOwner.email == email)
-        )
+        result = await db.execute(select(AppOwner).where(AppOwner.email == email))
         owner = result.scalar_one_or_none()
 
         # Check if owner exists and has password hash
@@ -181,4 +179,3 @@ async def logout_user(db: AsyncSession, refresh_token: str) -> None:
     """
     # With stateless JWT tokens, logout is handled client-side
     # Token blacklisting could be implemented here if needed
-    pass

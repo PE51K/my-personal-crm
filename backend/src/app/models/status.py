@@ -30,4 +30,6 @@ class Status(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
     # Relationships
-    contacts: Mapped[list["Contact"]] = relationship(back_populates="status", cascade="all, delete-orphan")
+    contacts: Mapped[list["Contact"]] = relationship(
+        back_populates="status", cascade="all, delete-orphan"
+    )

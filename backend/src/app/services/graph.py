@@ -5,20 +5,19 @@ import uuid
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from app.utils.errors import (
-    ContactNotFoundError,
-    GraphEdgeExistsError,
-    GraphEdgeNotFoundError,
-)
-from app.services.storage import get_file_url
 from app.models import Contact, ContactAssociation
 from app.schemas.graph import (
     EdgeResponse,
     GraphEdge,
     GraphNode,
     GraphResponse,
+)
+from app.services.storage import get_file_url
+from app.utils.errors import (
+    ContactNotFoundError,
+    GraphEdgeExistsError,
+    GraphEdgeNotFoundError,
 )
 
 logger = logging.getLogger(__name__)

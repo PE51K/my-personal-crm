@@ -10,7 +10,6 @@ import {
 } from '@/services/graph';
 import type {
   EdgeCreateRequest,
-  GraphResponse,
 } from '@/types';
 import { contactKeys } from './useContacts';
 

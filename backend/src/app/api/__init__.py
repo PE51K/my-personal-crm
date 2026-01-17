@@ -11,11 +11,11 @@ from app.api.dependencies import (
 )
 
 __all__ = [
-    "get_token_payload",
-    "get_current_user",
-    "get_current_owner",
-    "CurrentUser",
-    "CurrentOwner",
-    "DBSession",
     "AppSettings",
+    "CurrentOwner",
+    "CurrentUser",
+    "DBSession",
+    "get_current_owner",
+    "get_current_user",
+    "get_token_payload",
 ]

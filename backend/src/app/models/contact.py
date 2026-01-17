@@ -9,12 +9,12 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
-from app.models.tables import contact_tags, contact_interests, contact_occupations
+from app.models.tables import contact_interests, contact_occupations, contact_tags
 
 if TYPE_CHECKING:
-    from app.models.status import Status
     from app.models.association import ContactAssociation
-    from app.models.lookup import Tag, Interest, Occupation
+    from app.models.lookup import Interest, Occupation, Tag
+    from app.models.status import Status
 
 
 class Contact(Base):
@@ -63,8 +63,12 @@ class Contact(Base):
     # Relationships
     status: Mapped["Status | None"] = relationship(back_populates="contacts")
     tags: Mapped[list["Tag"]] = relationship(secondary=contact_tags, back_populates="contacts")
-    interests: Mapped[list["Interest"]] = relationship(secondary=contact_interests, back_populates="contacts")
-    occupations: Mapped[list["Occupation"]] = relationship(secondary=contact_occupations, back_populates="contacts")
+    interests: Mapped[list["Interest"]] = relationship(
+        secondary=contact_interests, back_populates="contacts"
+    )
+    occupations: Mapped[list["Occupation"]] = relationship(
+        secondary=contact_occupations, back_populates="contacts"
+    )
 
     # Self-referential relationships for contact associations (graph edges)
     source_associations: Mapped[list["ContactAssociation"]] = relationship(

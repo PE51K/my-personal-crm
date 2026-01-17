@@ -35,6 +35,23 @@ interface PendingEdgeDelete {
 
 type PendingChange = PendingEdgeAdd | PendingEdgeDelete;
 
+// Type for vis.js network instance
+interface NetworkInstance {
+  getPositions: (nodeIds: (string | number)[]) => Record<string | number, { x: number; y: number }>;
+  fit: (options?: { animation?: { duration?: number; easingFunction?: string } }) => void;
+  once: (event: string, callback: () => void) => void;
+  on: (event: string, callback: () => void) => void;
+  off: (event: string, callback: () => void) => void;
+  setOptions: (options: Record<string, unknown>) => void;
+  body: {
+    data: {
+      nodes: {
+        update: (updates: Array<Record<string, unknown>>) => void;
+      };
+    };
+  };
+}
+
 // Generate a color based on the node ID for consistent, visually distinct colors
 function getNodeColor(id: string): string {
   const colors = [
@@ -65,8 +82,8 @@ export function GraphView({
 }: GraphViewProps): ReactNode {
   const [edgeCreationMode, setEdgeCreationMode] = useState(false);
   const [connectingNodeId, setConnectingNodeId] = useState<string | null>(null);
-  const networkRef = useRef<any>(null);
-  const [network, setNetwork] = useState<any>(null);
+  const networkRef = useRef<NetworkInstance | null>(null);
+  const [network, setNetwork] = useState<NetworkInstance | null>(null);
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
   const [isStabilized, setIsStabilized] = useState(false);
   const [graphKey, setGraphKey] = useState(0);
@@ -88,10 +105,14 @@ export function GraphView({
   const graphEdges = useMemo(() => {
     const existingEdges = data?.edges || [];
     const edgesToDelete = new Set(
-      pendingChanges.filter((c) => c.type === 'delete').map((c) => (c as PendingEdgeDelete).edgeId)
+      pendingChanges
+        .filter((c): c is PendingEdgeDelete => c.type === 'delete')
+        .map((c) => c.edgeId)
     );
     const filteredEdges = existingEdges.filter((edge) => !edgesToDelete.has(edge.id));
-    const pendingAdditions = pendingChanges.filter((c) => c.type === 'add') as PendingEdgeAdd[];
+    const pendingAdditions = pendingChanges.filter(
+      (c): c is PendingEdgeAdd => c.type === 'add'
+    );
     const filteredPendingAdditions = pendingAdditions.filter((pending) => {
       const matchingRealEdge = filteredEdges.find(
         (edge) =>
@@ -104,7 +125,7 @@ export function GraphView({
       id: add.tempId,
       source_id: add.sourceId,
       target_id: add.targetId,
-      label: undefined as string | undefined,
+      label: undefined,
     }));
     const allEdges = [...filteredEdges, ...pendingEdges];
     const seenIds = new Set<string>();
@@ -146,7 +167,25 @@ export function GraphView({
       const fullName = `${node.first_name} ${node.last_name || ''}`.trim();
       const nodeColor = getNodeColor(node.id);
 
-      const nodeConfig: any = {
+      const nodeConfig: {
+        id: string;
+        label: string;
+        title: string;
+        color: {
+          background: string;
+          border: string;
+          highlight: { background: string; border: string };
+          hover: { background: string; border: string };
+        };
+        shape: string;
+        size: number;
+        font: { color: string; size: number; face: string };
+        borderWidth: number;
+        borderWidthSelected: number;
+        image?: string;
+        x?: number;
+        y?: number;
+      } = {
         id: node.id,
         label: fullName,
         title: fullName, // Tooltip
@@ -187,7 +226,7 @@ export function GraphView({
 
       return nodeConfig;
     }) || [],
-    edges: graphEdges as any,
+    edges: graphEdges,
   };
 
   // Graph options for Obsidian-like appearance
@@ -318,7 +357,7 @@ export function GraphView({
     setPendingChanges((prev) => {
       // If this is a pending addition, just remove it from the list
       const pendingAdd = prev.find(
-        (c) => c.type === 'add' && (c as PendingEdgeAdd).tempId === edgeId
+        (c): c is PendingEdgeAdd => c.type === 'add' && c.tempId === edgeId
       );
       if (pendingAdd) {
         return prev.filter((c) => c !== pendingAdd);
@@ -335,7 +374,7 @@ export function GraphView({
   }, [network, data?.nodes]);
 
   // Handler to save all pending changes
-  const handleSaveChanges = useCallback(async () => {
+  const handleSaveChanges = useCallback(() => {
     // Capture current positions before remounting
     if (network && data?.nodes) {
       data.nodes.forEach((node) => {
@@ -359,46 +398,35 @@ export function GraphView({
 
     for (const change of changesToProcess) {
       if (change.type === 'add') {
-        const add = change as PendingEdgeAdd;
         // Create a normalized key for the edge (sorted to handle bidirectional)
-        const key = [add.sourceId, add.targetId].sort().join('|');
-        edgesToCreate.set(key, { sourceId: add.sourceId, targetId: add.targetId });
+        const key = [change.sourceId, change.targetId].sort().join('|');
+        edgesToCreate.set(key, { sourceId: change.sourceId, targetId: change.targetId });
       } else {
-        const del = change as PendingEdgeDelete;
         // Only delete real edges, not temporary pending edges
-        if (!del.edgeId.startsWith('pending-')) {
-          edgesToDelete.add(del.edgeId);
+        if (!change.edgeId.startsWith('pending-')) {
+          edgesToDelete.add(change.edgeId);
         }
       }
     }
 
-    // Apply all changes and wait for them to complete
-    const promises: Promise<any>[] = [];
-
+    // Apply all changes
     // Delete edges first to avoid conflicts
     for (const edgeId of edgesToDelete) {
-      promises.push(
-        Promise.resolve(onEdgeDelete(edgeId)).catch((err) => {
-          console.error('Failed to delete edge:', err);
-        })
-      );
+      try {
+        onEdgeDelete(edgeId);
+      } catch (err) {
+        console.error('Failed to delete edge:', err);
+      }
     }
-
-    // Wait for deletions to complete before creating new edges
-    await Promise.all(promises);
-    promises.length = 0;
 
     // Create edges
     for (const edge of edgesToCreate.values()) {
-      promises.push(
-        Promise.resolve(onEdgeCreate(edge.sourceId, edge.targetId)).catch((err) => {
-          console.error('Failed to create edge:', err);
-        })
-      );
+      try {
+        onEdgeCreate(edge.sourceId, edge.targetId);
+      } catch (err) {
+        console.error('Failed to create edge:', err);
+      }
     }
-
-    // Wait for all mutations to complete
-    await Promise.all(promises);
   }, [pendingChanges, onEdgeCreate, onEdgeDelete, network, data?.nodes]);
 
   // Handler to discard all pending changes
@@ -423,7 +451,7 @@ export function GraphView({
 
   // Event handlers
   const events = {
-    select: (event: any) => {
+    select: (event: { nodes: (string | number)[] }) => {
       const { nodes } = event;
 
       if (edgeCreationMode && nodes.length > 0) {
@@ -442,20 +470,22 @@ export function GraphView({
           );
 
           const pendingEdge = pendingChanges.find(
-            (c) =>
+            (c): c is PendingEdgeAdd =>
               c.type === 'add' &&
-              (((c as PendingEdgeAdd).sourceId === connectingNodeId &&
-                (c as PendingEdgeAdd).targetId === clickedNodeId) ||
-                ((c as PendingEdgeAdd).sourceId === clickedNodeId &&
-                (c as PendingEdgeAdd).targetId === connectingNodeId))
+              ((c.sourceId === connectingNodeId && c.targetId === clickedNodeId) ||
+                (c.sourceId === clickedNodeId && c.targetId === connectingNodeId))
           );
 
-          if (existingEdge && !pendingChanges.find(c => c.type === 'delete' && (c as PendingEdgeDelete).edgeId === existingEdge.id)) {
+          const isPendingDelete = pendingChanges.some(
+            (c): c is PendingEdgeDelete => c.type === 'delete' && c.edgeId === existingEdge?.id
+          );
+
+          if (existingEdge && !isPendingDelete) {
             // Connection exists - mark for removal
             handlePendingEdgeDelete(existingEdge.id);
           } else if (pendingEdge) {
             // Pending connection exists - remove it
-            handlePendingEdgeDelete((pendingEdge as PendingEdgeAdd).tempId);
+            handlePendingEdgeDelete(pendingEdge.tempId);
           } else {
             // No connection - create new edge (pending)
             handlePendingEdgeCreate(connectingNodeId, clickedNodeId);
@@ -474,16 +504,16 @@ export function GraphView({
         }
       }
     },
-    doubleClick: (event: any) => {
+    doubleClick: (event: { edges: (string | number)[] }) => {
       if (event.edges.length > 0) {
         // Double-click edge to delete (works in both modes now)
-        handlePendingEdgeDelete(event.edges[0]);
+        handlePendingEdgeDelete(String(event.edges[0]));
       }
     },
   };
 
   // Get network instance
-  const getNetwork = useCallback((networkInstance: any) => {
+  const getNetwork = useCallback((networkInstance: NetworkInstance | null) => {
     if (networkInstance && !network) {
       setNetwork(networkInstance);
       networkRef.current = networkInstance;

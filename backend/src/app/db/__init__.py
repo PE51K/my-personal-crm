@@ -4,9 +4,9 @@ from app.db.database import AsyncSessionLocal, DBSession, engine, get_db
 from app.db.migrations import initialize_app
 
 __all__ = [
-    "get_db",
-    "engine",
     "AsyncSessionLocal",
     "DBSession",
+    "engine",
+    "get_db",
     "initialize_app",
 ]

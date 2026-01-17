@@ -146,4 +146,3 @@ async def delete_edge_endpoint(
         GraphEdgeNotFoundError: If edge doesn't exist.
     """
     await delete_edge(db, edge_id)
-

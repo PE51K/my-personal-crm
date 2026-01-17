@@ -5,7 +5,8 @@ Revises:
 Create Date: 2026-01-17
 
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
@@ -13,9 +14,9 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -27,7 +28,12 @@ def upgrade() -> None:
         sa.Column("supabase_user_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("email", sa.Text(), nullable=False),
         sa.Column("password_hash", sa.String(length=255), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.CheckConstraint("id = 1", name="app_owner_single_row"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("supabase_user_id"),
@@ -37,11 +43,21 @@ def upgrade() -> None:
     # Create statuses table
     op.create_table(
         "statuses",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            nullable=False,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("idx_statuses_is_active", "statuses", ["is_active"])
@@ -49,7 +65,12 @@ def upgrade() -> None:
     # Create contacts table
     op.create_table(
         "contacts",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            nullable=False,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("first_name", sa.Text(), nullable=False),
         sa.Column("middle_name", sa.Text(), nullable=True),
         sa.Column("last_name", sa.Text(), nullable=True),
@@ -63,8 +84,18 @@ def upgrade() -> None:
         sa.Column("sort_order_in_status", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("position_x", sa.Float(), nullable=True),
         sa.Column("position_y", sa.Float(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["status_id"], ["statuses.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -75,27 +106,57 @@ def upgrade() -> None:
     # Create lookup tables
     op.create_table(
         "tags",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            nullable=False,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("name", sa.Text(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name"),
     )
 
     op.create_table(
         "interests",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            nullable=False,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("name", sa.Text(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name"),
     )
 
     op.create_table(
         "occupations",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            nullable=False,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("name", sa.Text(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name"),
     )
@@ -131,19 +192,37 @@ def upgrade() -> None:
     # Create contact_associations table
     op.create_table(
         "contact_associations",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            nullable=False,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("source_contact_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("target_contact_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("label", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.CheckConstraint("source_contact_id != target_contact_id", name="check_no_self_association"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.CheckConstraint(
+            "source_contact_id != target_contact_id", name="check_no_self_association"
+        ),
         sa.ForeignKeyConstraint(["source_contact_id"], ["contacts.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["target_contact_id"], ["contacts.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("source_contact_id", "target_contact_id", name="uq_contact_association"),
+        sa.UniqueConstraint(
+            "source_contact_id", "target_contact_id", name="uq_contact_association"
+        ),
     )
-    op.create_index("idx_contact_associations_source", "contact_associations", ["source_contact_id"])
-    op.create_index("idx_contact_associations_target", "contact_associations", ["target_contact_id"])
+    op.create_index(
+        "idx_contact_associations_source", "contact_associations", ["source_contact_id"]
+    )
+    op.create_index(
+        "idx_contact_associations_target", "contact_associations", ["target_contact_id"]
+    )
 
     # Create trigger function for updated_at
     op.execute("""

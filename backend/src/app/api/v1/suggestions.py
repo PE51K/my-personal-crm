@@ -4,7 +4,14 @@ from fastapi import APIRouter, Query
 from sqlalchemy import func, select
 
 from app.api.dependencies import CurrentOwner, DBSession
-from app.models import Tag, Interest, Occupation, contact_tags, contact_interests, contact_occupations
+from app.models import (
+    Interest,
+    Occupation,
+    Tag,
+    contact_interests,
+    contact_occupations,
+    contact_tags,
+)
 from app.schemas.suggestion import SuggestionItem, SuggestionListResponse
 
 router = APIRouter(prefix="/suggestions", tags=["Suggestions"])
@@ -37,18 +44,14 @@ async def get_tag_suggestions(
     """
     # Search tags with usage count
     query = (
-        select(
-            Tag.id,
-            Tag.name,
-            func.count(contact_tags.c.contact_id).label("usage_count")
-        )
+        select(Tag.id, Tag.name, func.count(contact_tags.c.contact_id).label("usage_count"))
         .outerjoin(contact_tags, Tag.id == contact_tags.c.tag_id)
         .where(Tag.name.ilike(f"%{q}%"))
         .group_by(Tag.id, Tag.name)
         .order_by(func.count(contact_tags.c.contact_id).desc())
         .limit(limit)
     )
-    
+
     result = await db.execute(query)
     rows = result.all()
 
@@ -94,7 +97,7 @@ async def get_interest_suggestions(
         select(
             Interest.id,
             Interest.name,
-            func.count(contact_interests.c.contact_id).label("usage_count")
+            func.count(contact_interests.c.contact_id).label("usage_count"),
         )
         .outerjoin(contact_interests, Interest.id == contact_interests.c.interest_id)
         .where(Interest.name.ilike(f"%{q}%"))
@@ -102,7 +105,7 @@ async def get_interest_suggestions(
         .order_by(func.count(contact_interests.c.contact_id).desc())
         .limit(limit)
     )
-    
+
     result = await db.execute(query)
     rows = result.all()
 
@@ -148,7 +151,7 @@ async def get_occupation_suggestions(
         select(
             Occupation.id,
             Occupation.name,
-            func.count(contact_occupations.c.contact_id).label("usage_count")
+            func.count(contact_occupations.c.contact_id).label("usage_count"),
         )
         .outerjoin(contact_occupations, Occupation.id == contact_occupations.c.occupation_id)
         .where(Occupation.name.ilike(f"%{q}%"))
@@ -156,7 +159,7 @@ async def get_occupation_suggestions(
         .order_by(func.count(contact_occupations.c.contact_id).desc())
         .limit(limit)
     )
-    
+
     result = await db.execute(query)
     rows = result.all()
 

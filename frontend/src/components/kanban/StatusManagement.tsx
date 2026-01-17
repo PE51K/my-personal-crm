@@ -2,7 +2,7 @@
  * Status Management component for CRUD operations on statuses
  */
 
-import { type ReactNode, useState, useEffect } from 'react';
+import { type ReactNode, useState, useEffect, useMemo } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -221,7 +221,7 @@ export function StatusManagement({
   const deleteMutation = useDeleteStatus();
   const reorderMutation = useReorderStatuses();
 
-  const statuses = statusesData?.data ?? [];
+  const statuses = useMemo(() => statusesData?.data ?? [], [statusesData?.data]);
 
   // Sync local state with fetched data whenever it changes
   useEffect(() => {
@@ -351,8 +351,12 @@ export function StatusManagement({
                     key={status.id}
                     status={status}
                     onEdit={handleEdit}
-                    onDelete={handleDelete}
-                    onToggleActive={handleToggleActive}
+                    onDelete={(status) => {
+                      void handleDelete(status);
+                    }}
+                    onToggleActive={(status) => {
+                      void handleToggleActive(status);
+                    }}
                   />
                 ))}
               </div>

@@ -301,7 +301,7 @@ export function ContactForm({
           placeholder="Select or create status..."
           query={statusQuery}
           onQueryChange={setStatusQuery}
-          suggestions={statusSuggestions ?? []}
+          suggestions={statusSuggestions}
           selectedItems={selectedStatus ? [selectedStatus] : []}
           onSelect={(item) => {
             setSelectedStatus(item as Status);
@@ -379,16 +379,16 @@ export function ContactForm({
         placeholder="Search contacts to associate..."
         query={associationQuery}
         onQueryChange={setAssociationQuery}
-        suggestions={associationSuggestions?.map((a) => ({
+        suggestions={associationSuggestions.map((a) => ({
           id: a.id,
           name: [a.first_name, a.middle_name, a.last_name].filter(Boolean).join(' '),
-        })) ?? []}
+        }))}
         selectedItems={selectedAssociations.map((a) => ({
           id: a.id,
           name: [a.first_name, a.middle_name, a.last_name].filter(Boolean).join(' '),
         }))}
         onSelect={(item) => {
-          const contact = associationSuggestions?.find((a) => a.id === item.id);
+          const contact = associationSuggestions.find((a) => a.id === item.id);
           if (contact) {
             setSelectedAssociations((prev) => [...prev, contact]);
           }

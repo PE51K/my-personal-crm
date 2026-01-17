@@ -5,12 +5,10 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import CurrentOwner, DBSession
 from app.models.contact import Contact
 from app.models.status import Status
-from app.utils.errors import StatusNotFoundError
 from app.schemas.status import (
     StatusCreateRequest,
     StatusListResponse,
@@ -19,6 +17,7 @@ from app.schemas.status import (
     StatusResponse,
     StatusUpdateRequest,
 )
+from app.utils.errors import StatusNotFoundError
 
 router = APIRouter(prefix="/statuses", tags=["Statuses"])
 
@@ -50,7 +49,7 @@ async def list_statuses(
     query = select(Status).order_by(Status.sort_order)
 
     if not include_inactive:
-        query = query.where(Status.is_active == True)
+        query = query.where(Status.is_active)
 
     result = await db.execute(query)
     statuses_data = result.scalars().all()
@@ -107,14 +106,12 @@ async def create_status(
 
     Returns:
         Created status.
-    
+
     Raises:
         HTTPException: If a status with the same name already exists.
     """
     # Get max sort_order
-    max_order_result = await db.execute(
-        select(func.max(Status.sort_order))
-    )
+    max_order_result = await db.execute(select(func.max(Status.sort_order)))
     max_order = max_order_result.scalar() or 0
     new_order = max_order + 1
 
@@ -125,7 +122,7 @@ async def create_status(
         is_active=request.is_active if request.is_active is not None else True,
     )
     db.add(new_status)
-    
+
     try:
         await db.commit()
         await db.refresh(new_status)
@@ -134,7 +131,7 @@ async def create_status(
         raise HTTPException(
             status_code=409,
             detail=f"Status with name '{request.name}' already exists",
-        )
+        ) from None
 
     return StatusResponse(
         id=str(new_status.id),
@@ -180,9 +177,7 @@ async def update_status(
         HTTPException: If trying to rename to an existing status name.
     """
     # Check status exists
-    result = await db.execute(
-        select(Status).where(Status.id == UUID(status_id))
-    )
+    result = await db.execute(select(Status).where(Status.id == UUID(status_id)))
     status_obj = result.scalar_one_or_none()
     if not status_obj:
         raise StatusNotFoundError(status_id)
@@ -201,7 +196,7 @@ async def update_status(
         raise HTTPException(
             status_code=409,
             detail=f"Status with name '{request.name}' already exists",
-        )
+        ) from None
 
     # Get contact count
     count_result = await db.execute(
@@ -245,9 +240,7 @@ async def reorder_statuses(
     # Update sort_order for each status
     for index, status_id in enumerate(request.order):
         await db.execute(
-            update(Status)
-            .where(Status.id == UUID(status_id))
-            .values(sort_order=index + 1)
+            update(Status).where(Status.id == UUID(status_id)).values(sort_order=index + 1)
         )
 
     await db.commit()
@@ -288,9 +281,7 @@ async def delete_status(
         HTTPException: If status is in use by contacts.
     """
     # Check status exists
-    result = await db.execute(
-        select(Status).where(Status.id == UUID(status_id))
-    )
+    result = await db.execute(select(Status).where(Status.id == UUID(status_id)))
     status_obj = result.scalar_one_or_none()
     if not status_obj:
         raise StatusNotFoundError(status_id)
@@ -308,7 +299,5 @@ async def delete_status(
         )
 
     # Delete status
-    await db.execute(
-        delete(Status).where(Status.id == UUID(status_id))
-    )
+    await db.execute(delete(Status).where(Status.id == UUID(status_id)))
     await db.commit()

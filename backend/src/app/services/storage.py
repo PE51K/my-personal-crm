@@ -12,7 +12,12 @@ from minio import Minio
 from minio.error import S3Error
 
 from app.core.settings import get_settings
-from app.utils.errors import FileTooLargeError, FileTypeInvalidError, InternalError, PhotoNotFoundError
+from app.utils.errors import (
+    FileTooLargeError,
+    FileTypeInvalidError,
+    InternalError,
+    PhotoNotFoundError,
+)
 
 # Allowed image MIME types
 ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
@@ -220,14 +225,13 @@ def get_file_url(object_name: str, expires_seconds: int = 3600) -> str:
         client = get_minio_client()
 
         # Generate presigned URL (MinIO expects timedelta, not int)
-        url = client.presigned_get_object(
+        return client.presigned_get_object(
             bucket_name=bucket_name,
             object_name=object_name,
             expires=timedelta(seconds=expires_seconds),
         )
-        return url
     except S3Error as e:
-        raise PhotoNotFoundError() from e
+        raise PhotoNotFoundError from e
     except Exception as e:
         raise InternalError(f"Failed to generate file URL: {e}") from e
 
@@ -248,11 +252,12 @@ def file_exists(object_name: str) -> bool:
 
         # Try to get object metadata
         client.stat_object(bucket_name, object_name)
-        return True
     except S3Error:
         return False
     except Exception:
         return False
+    else:
+        return True
 
 
 def get_file_stream(object_name: str) -> BinaryIO:
@@ -283,6 +288,6 @@ def get_file_stream(object_name: str) -> BinaryIO:
 
         return io.BytesIO(file_data)
     except S3Error as e:
-        raise PhotoNotFoundError() from e
+        raise PhotoNotFoundError from e
     except Exception as e:
         raise InternalError(f"Failed to retrieve file: {e}") from e

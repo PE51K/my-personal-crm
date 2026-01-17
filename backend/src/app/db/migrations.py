@@ -1,6 +1,5 @@
 """Database migration and initialization utilities."""
 
-import asyncio
 import logging
 from pathlib import Path
 
@@ -41,7 +40,7 @@ def run_alembic_migrations() -> None:
         logger.info("✓ All migrations completed")
 
     except Exception as e:
-        logger.error("✗ Migration failed: %s", e)
+        logger.exception("✗ Migration failed")
         raise RuntimeError(f"Alembic migration failed: {e}") from e
 
 
@@ -125,7 +124,6 @@ async def initialize_app(settings: Settings) -> None:
 
     try:
         # Skip migrations - run them manually with: uv run alembic upgrade head
-        # run_alembic_migrations()
         logger.info("Skipping automatic migrations (run manually if needed)")
         logger.info("")
 
@@ -142,8 +140,8 @@ async def initialize_app(settings: Settings) -> None:
         logger.info("============================================")
         logger.info("")
 
-    except Exception as e:
+    except Exception:
         logger.error("============================================")
-        logger.error("✗ Initialization failed: %s", e)
+        logger.exception("✗ Initialization failed")
         logger.error("============================================")
         raise

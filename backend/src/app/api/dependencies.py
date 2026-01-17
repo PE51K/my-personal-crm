@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import Settings, get_settings
 from app.db.database import get_db
+from app.models import AppOwner
 from app.utils.errors import (
     AuthForbiddenError,
     AuthTokenExpiredError,
@@ -21,7 +22,6 @@ from app.utils.security import (
     extract_bearer_token,
     verify_jwt_token,
 )
-from app.models import AppOwner
 
 
 async def get_token_payload(
@@ -77,9 +77,7 @@ async def get_current_user(
         raise AuthTokenInvalidError(detail="Invalid user ID in token") from e
 
     # Check if user is the app owner
-    result = await db.execute(
-        select(AppOwner).where(AppOwner.user_id == user_id)
-    )
+    result = await db.execute(select(AppOwner).where(AppOwner.user_id == user_id))
     owner = result.scalar_one_or_none()
 
     if not owner:
