@@ -46,7 +46,8 @@ FastAPI backend for the Personal CRM application.
 
 5. **Start development server**
    ```bash
-   uv run uvicorn app.main:app --reload
+   # Watch only src directory to avoid permission issues with volumes
+   uv run uvicorn app.main:app --reload --reload-dir src --host 0.0.0.0 --port 8000
    ```
 
 The API will be available at http://localhost:8000

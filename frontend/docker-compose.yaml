@@ -33,4 +33,4 @@ services:
 networks:
   crm-network:
     name: personal-crm-network
-    external: true
+    external: false

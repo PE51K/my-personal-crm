@@ -108,3 +108,4 @@ networks:
   crm-network:
     name: personal-crm-network
     driver: bridge
+    external: false

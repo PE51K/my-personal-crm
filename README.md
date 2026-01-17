@@ -91,7 +91,7 @@ my-personal-crm/
 
 3. **Start databases with Docker**
 
-   Databases always run in Docker. To start only the databases:
+   Databases always run in Docker. Docker Compose will automatically create the network and volumes. To start only the databases:
    ```bash
    docker compose up db minio -d
    ```
@@ -106,8 +106,8 @@ my-personal-crm/
    # Run migrations
    uv run alembic upgrade head
 
-   # Start the API
-   uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   # Start the API (watches only src directory to avoid permission issues with volumes)
+   uv run uvicorn app.main:app --reload --reload-dir src --host 0.0.0.0 --port 8000
    ```
 
 5. **Run frontend locally**
@@ -210,7 +210,7 @@ VITE_API_BASE_URL=/api
 ```bash
 # Development with databases in Docker
 docker compose up db minio -d        # Start databases only
-cd backend && uv run uvicorn app.main:app --reload
+cd backend && uv run uvicorn app.main:app --reload --reload-dir src
 cd frontend && npm run dev
 
 # Full Docker deployment
