@@ -86,7 +86,7 @@ export function Modal({
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in"
       onClick={handleOverlayClick}
       onKeyDown={handleKeyDown}
       role="dialog"
@@ -95,14 +95,14 @@ export function Modal({
     >
       <div
         ref={modalRef}
-        className={`relative bg-white rounded-lg shadow-modal w-full ${sizeStyles[size]} max-h-[90vh] overflow-hidden flex flex-col animate-scale-in`}
+        className={`relative bg-white rounded-xl shadow-2xl w-full ${sizeStyles[size]} max-h-[90vh] overflow-hidden flex flex-col animate-scale-in`}
         tabIndex={-1}
       >
         {/* Header */}
         {(title ?? showCloseButton) && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between px-8 py-5 border-b border-gray-200">
             {title && (
-              <h2 id="modal-title" className="text-lg font-semibold text-gray-900">
+              <h2 id="modal-title" className="text-xl font-semibold text-gray-900">
                 {title}
               </h2>
             )}
@@ -110,11 +110,11 @@ export function Modal({
               <button
                 type="button"
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded-md p-1 transition-colors duration-150"
+                className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded-lg p-2 transition-colors duration-150 w-10 h-10 flex items-center justify-center hover:bg-gray-100"
                 aria-label="Close modal"
               >
                 <svg
-                  className="h-6 w-6"
+                  className="h-5 w-5"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -132,7 +132,7 @@ export function Modal({
         )}
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">{children}</div>
+        <div className="flex-1 overflow-y-auto px-8 py-6">{children}</div>
       </div>
     </div>
   );
@@ -151,7 +151,7 @@ interface ModalFooterProps {
 export function ModalFooter({ children, className = '' }: ModalFooterProps): ReactNode {
   return (
     <div
-      className={`flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 -mx-6 -mb-4 mt-4 ${className}`}
+      className={`flex items-center justify-between gap-3 px-8 py-5 border-t border-gray-200 bg-gray-50 -mx-8 -mb-6 mt-6 ${className}`}
     >
       {children}
     </div>

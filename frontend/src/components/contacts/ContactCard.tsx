@@ -60,29 +60,33 @@ export function ContactCard({
   return (
     <Card
       hover
-      padding="md"
-      className={`cursor-pointer ${className}`}
+      padding="sm"
+      className={`cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.02] ${className}`}
       onClick={onClick}
     >
-      <div className="flex items-start space-x-4">
-        <Avatar src={contact.photo_url} name={fullName} size="lg" />
+      <div className="flex items-start space-x-3 p-2">
+        <Avatar src={contact.photo_url} name={fullName} size="md" />
         <div className="flex-1 min-w-0">
-          <h3 className="text-base font-medium text-gray-900 truncate">
+          <h3 className="text-sm font-semibold text-gray-900 truncate">
             {fullName}
           </h3>
           {contact.status && (
-            <p className="text-sm text-gray-500 mt-0.5">{contact.status.name}</p>
+            <div className="mt-1">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700 border border-primary-200">
+                {contact.status.name}
+              </span>
+            </div>
           )}
           {contact.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
-              {contact.tags.slice(0, 3).map((tag) => (
+              {contact.tags.slice(0, 2).map((tag) => (
                 <Badge key={tag.id} variant="primary" size="sm">
                   {tag.name}
                 </Badge>
               ))}
-              {contact.tags.length > 3 && (
+              {contact.tags.length > 2 && (
                 <Badge size="sm" variant="default">
-                  +{contact.tags.length - 3}
+                  +{contact.tags.length - 2}
                 </Badge>
               )}
             </div>

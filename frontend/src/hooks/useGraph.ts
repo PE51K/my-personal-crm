@@ -42,9 +42,22 @@ export function useCreateEdge() {
   return useMutation({
     mutationFn: (data: EdgeCreateRequest) => createEdge(data),
     onSuccess: (newEdge) => {
-      // Optimistically add edge to graph
+      // Optimistically add edge to graph (with deduplication)
       queryClient.setQueryData<GraphResponse>(graphKeys.data(), (old) => {
         if (!old) return old;
+
+        // Check if edge already exists (by ID or by source/target pair)
+        const edgeExists = old.edges.some(
+          (edge) =>
+            edge.id === newEdge.id ||
+            (edge.source_id === newEdge.source_id && edge.target_id === newEdge.target_id) ||
+            (edge.source_id === newEdge.target_id && edge.target_id === newEdge.source_id)
+        );
+
+        if (edgeExists) {
+          return old; // Don't add duplicate
+        }
+
         return {
           ...old,
           edges: [

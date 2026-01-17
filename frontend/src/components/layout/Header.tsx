@@ -98,7 +98,7 @@ export function Header(): ReactNode {
   return (
     <header className="bg-white border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center h-14">
           {/* Logo */}
           <div className="flex-shrink-0 flex items-center">
             <Link to="/" className="text-xl font-bold text-primary-600">
@@ -116,14 +116,11 @@ export function Header(): ReactNode {
                   to={item.path}
                   className={`relative flex items-center px-4 py-2 rounded-md text-sm transition-all duration-150 ${
                     isActive
-                      ? 'bg-primary-50 text-primary-700 font-semibold shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium'
+                      ? 'bg-blue-50 text-primary-700 font-semibold border-l-4 border-primary-600'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium border-l-4 border-transparent'
                   }`}
                 >
-                  {isActive && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary-600 rounded-r-full" />
-                  )}
-                  <span className={`${isActive ? 'ml-2' : ''} mr-2`}>{item.icon}</span>
+                  <span className="mr-2">{item.icon}</span>
                   {item.label}
                 </Link>
               );
@@ -161,14 +158,11 @@ export function Header(): ReactNode {
                 to={item.path}
                 className={`relative flex items-center px-3 py-2 rounded-md text-sm whitespace-nowrap transition-all duration-150 ${
                   isActive
-                    ? 'bg-primary-50 text-primary-700 font-semibold shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium'
+                    ? 'bg-blue-50 text-primary-700 font-semibold border-l-3 border-primary-600'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium border-l-3 border-transparent'
                 }`}
               >
-                {isActive && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary-600 rounded-r-full" />
-                )}
-                <span className={`${isActive ? 'ml-1' : ''} mr-1`}>{item.icon}</span>
+                <span className="mr-1">{item.icon}</span>
                 {item.label}
               </Link>
             );

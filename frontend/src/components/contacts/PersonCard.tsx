@@ -188,7 +188,7 @@ export function PersonCard({
           <div className="flex-1">
             <h2 className="text-xl font-semibold text-gray-900">{fullName}</h2>
             {contact.status && (
-              <span className="inline-block mt-1 px-2 py-0.5 text-sm bg-primary-100 text-primary-800 rounded">
+              <span className="inline-block mt-1 px-3 py-1 text-sm font-medium bg-primary-100 text-primary-700 rounded-full border border-primary-200">
                 {contact.status.name}
               </span>
             )}
@@ -202,8 +202,8 @@ export function PersonCard({
 
         {/* Social links */}
         {(contact.telegram_username ?? contact.linkedin_url ?? contact.github_username) && (
-          <div className="border-t border-gray-200 pt-4">
-            <h3 className="text-sm font-medium text-gray-900 mb-2">Social Links</h3>
+          <div className="border-t border-gray-100 pt-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Social Links</h3>
             <div className="space-y-1">
               {contact.telegram_username && (
                 <p className="text-sm text-gray-600">
@@ -252,15 +252,15 @@ export function PersonCard({
         {(contact.tags.length > 0 ||
           contact.interests.length > 0 ||
           contact.occupations.length > 0) && (
-          <div className="border-t border-gray-200 pt-4">
+          <div className="border-t border-gray-100 pt-6">
             {contact.tags.length > 0 && (
-              <div className="mb-3">
-                <h3 className="text-sm font-medium text-gray-900 mb-1">Tags</h3>
-                <div className="flex flex-wrap gap-1">
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Tags</h3>
+                <div className="flex flex-wrap gap-2">
                   {contact.tags.map((tag) => (
                     <span
                       key={tag.id}
-                      className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded-full"
+                      className="px-3 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full border border-gray-200"
                     >
                       {tag.name}
                     </span>
@@ -269,13 +269,13 @@ export function PersonCard({
               </div>
             )}
             {contact.interests.length > 0 && (
-              <div className="mb-3">
-                <h3 className="text-sm font-medium text-gray-900 mb-1">Interests</h3>
-                <div className="flex flex-wrap gap-1">
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Interests</h3>
+                <div className="flex flex-wrap gap-2">
                   {contact.interests.map((interest) => (
                     <span
                       key={interest.id}
-                      className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full"
+                      className="px-3 py-1 text-xs font-medium bg-success-100 text-success-700 rounded-full border border-success-200"
                     >
                       {interest.name}
                     </span>
@@ -285,12 +285,12 @@ export function PersonCard({
             )}
             {contact.occupations.length > 0 && (
               <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-1">Occupations</h3>
-                <div className="flex flex-wrap gap-1">
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Occupations</h3>
+                <div className="flex flex-wrap gap-2">
                   {contact.occupations.map((occupation) => (
                     <span
                       key={occupation.id}
-                      className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full"
+                      className="px-3 py-1 text-xs font-medium bg-primary-100 text-primary-700 rounded-full border border-primary-200"
                     >
                       {occupation.name}
                     </span>
@@ -303,21 +303,24 @@ export function PersonCard({
 
         {/* Notes */}
         {contact.notes && (
-          <div className="border-t border-gray-200 pt-4">
-            <h3 className="text-sm font-medium text-gray-900 mb-2">Notes</h3>
-            <p className="text-sm text-gray-600 whitespace-pre-wrap">{contact.notes}</p>
+          <div className="border-t border-gray-100 pt-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Notes</h3>
+            <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">{contact.notes}</p>
           </div>
         )}
 
         {/* Associations */}
         {contact.associations.length > 0 && (
-          <div className="border-t border-gray-200 pt-4">
-            <h3 className="text-sm font-medium text-gray-900 mb-2">Associations</h3>
-            <div className="space-y-1">
+          <div className="border-t border-gray-100 pt-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Associations</h3>
+            <div className="flex flex-wrap gap-2">
               {contact.associations.map((assoc) => (
-                <p key={assoc.id} className="text-sm text-gray-600">
+                <span
+                  key={assoc.id}
+                  className="inline-flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-full text-sm text-gray-700 hover:border-primary-300 hover:bg-primary-50 transition-colors cursor-pointer"
+                >
                   {assoc.first_name} {assoc.last_name}
-                </p>
+                </span>
               ))}
             </div>
           </div>
@@ -325,13 +328,21 @@ export function PersonCard({
       </div>
 
       <ModalFooter>
-        <Button variant="danger" onClick={() => { setShowDeleteConfirm(true); }}>
-          Delete
-        </Button>
-        <Button variant="secondary" onClick={handleClose}>
-          Close
-        </Button>
-        <Button onClick={() => { setIsEditing(true); }}>Edit</Button>
+        <div className="flex-1">
+          <Button
+            variant="danger"
+            onClick={() => { setShowDeleteConfirm(true); }}
+            className="border-2"
+          >
+            Delete Contact
+          </Button>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="secondary" onClick={handleClose}>
+            Close
+          </Button>
+          <Button onClick={() => { setIsEditing(true); }}>Edit</Button>
+        </div>
       </ModalFooter>
     </Modal>
   );
