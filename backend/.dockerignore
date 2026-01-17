@@ -1,13 +1,38 @@
+# =============================================================================
+# Backend .dockerignore
+# =============================================================================
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+
+# Virtual environments
 env/
 venv/
 ENV/
-.venv
+.venv/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Type checking
+.mypy_cache/
+.ruff_cache/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
 
 # IDEs
 .vscode/
@@ -16,25 +41,13 @@ ENV/
 *.swo
 *~
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-
-# Environment
-.env
-.env.local
-.env.*.local
-
 # Documentation
 *.md
 !README.md
 
-# Git
-.git/
-.gitignore
+# Logs
+*.log
 
 # Others
-*.log
 .DS_Store
+volumes/

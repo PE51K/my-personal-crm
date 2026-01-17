@@ -263,29 +263,6 @@ async def _build_contact_response(
         updated_at=contact.updated_at,
     )
 
-    return ContactResponse(
-        id=str(contact.id),
-        first_name=contact.first_name,
-        middle_name=contact.middle_name,
-        last_name=contact.last_name,
-        telegram_username=contact.telegram_username,
-        linkedin_url=contact.linkedin_url,
-        github_username=contact.github_username,
-        met_at=contact.met_at,
-        status_id=str(contact.status_id) if contact.status_id else None,
-        status=status,
-        notes=contact.notes,
-        photo_path=contact.photo_path,
-        photo_url=photo_url,
-        tags=tags,
-        interests=interests,
-        occupations=occupations,
-        associations=associations,
-        sort_order_in_status=contact.sort_order_in_status,
-        created_at=contact.created_at,
-        updated_at=contact.updated_at,
-    )
-
 
 async def create_contact(
     db: AsyncSession,
@@ -648,6 +625,7 @@ async def update_contact(
     met_at: date | None = None,
     status_id: str | None = None,
     notes: str | None = None,
+    photo_path: str | None = None,
     tag_ids: list[str | TagInput] | None = None,
     interest_ids: list[str | InterestInput] | None = None,
     occupation_ids: list[str | OccupationInput] | None = None,
@@ -667,6 +645,7 @@ async def update_contact(
         met_at: Date when contact was met.
         status_id: Status ID.
         notes: Additional notes.
+        photo_path: Photo storage path.
         tag_ids: List of tag IDs or objects to associate (supports temp IDs).
         interest_ids: List of interest IDs or objects to associate (supports temp IDs).
         occupation_ids: List of occupation IDs or objects to associate (supports temp IDs).
@@ -718,6 +697,8 @@ async def update_contact(
         contact.status_id = UUID(status_id)
     if notes is not None:
         contact.notes = notes
+    if photo_path is not None:
+        contact.photo_path = photo_path
 
     # Update tags if provided
     if tag_ids is not None:

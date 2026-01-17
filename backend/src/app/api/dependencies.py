@@ -4,6 +4,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import Depends, Header
+from jose import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,8 +17,6 @@ from app.utils.errors import (
     AuthUnauthorizedError,
 )
 from app.utils.security import (
-    TokenExpiredError,
-    TokenInvalidError,
     TokenPayload,
     extract_bearer_token,
     verify_jwt_token,
@@ -47,10 +46,10 @@ async def get_token_payload(
 
     try:
         return verify_jwt_token(token)
-    except TokenExpiredError as e:
+    except jwt.ExpiredSignatureError as e:
         raise AuthTokenExpiredError from e
-    except TokenInvalidError as e:
-        raise AuthTokenInvalidError(detail=e.message) from e
+    except jwt.JWTError as e:
+        raise AuthTokenInvalidError(detail=str(e)) from e
 
 
 async def get_current_user(

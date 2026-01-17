@@ -31,47 +31,6 @@ class TokenPayload(BaseModel):
     type: str = "access"  # access or refresh
 
 
-class JWTError(Exception):
-    """Base exception for JWT-related errors."""
-
-    def __init__(self, message: str, code: str) -> None:
-        """Initialize JWT error.
-
-        Args:
-            message: Human-readable error message.
-            code: Error code for API response.
-        """
-        self.message = message
-        self.code = code
-        super().__init__(message)
-
-
-class TokenExpiredError(JWTError):
-    """Exception raised when token has expired."""
-
-    def __init__(self) -> None:
-        """Initialize token expired error."""
-        super().__init__(
-            message="Token has expired",
-            code="AUTH_TOKEN_EXPIRED",
-        )
-
-
-class TokenInvalidError(JWTError):
-    """Exception raised when token is invalid."""
-
-    def __init__(self, detail: str = "Token is invalid") -> None:
-        """Initialize token invalid error.
-
-        Args:
-            detail: Specific detail about why token is invalid.
-        """
-        super().__init__(
-            message=detail,
-            code="AUTH_TOKEN_INVALID",
-        )
-
-
 # =============================================================================
 # Password Hashing Functions
 # =============================================================================
@@ -174,33 +133,26 @@ def verify_jwt_token(token: str, expected_type: str = "access") -> TokenPayload:
         TokenPayload with decoded claims.
 
     Raises:
-        TokenExpiredError: If the token has expired.
-        TokenInvalidError: If the token is malformed or signature is invalid.
+        jwt.ExpiredSignatureError: If the token has expired.
+        jwt.JWTError: If the token is malformed or signature is invalid.
     """
     settings = get_settings()
 
-    try:
-        payload: dict[str, Any] = jwt.decode(
-            token,
-            settings.security.jwt_secret_key,
-            algorithms=[settings.security.jwt_algorithm],
-        )
-    except jwt.ExpiredSignatureError as e:
-        raise TokenExpiredError from e
-    except jwt.JWTError as e:
-        raise TokenInvalidError(detail=str(e)) from e
+    payload: dict[str, Any] = jwt.decode(
+        token,
+        settings.security.jwt_secret_key,
+        algorithms=[settings.security.jwt_algorithm],
+    )
 
     # Validate required claims
     sub = payload.get("sub")
     if not sub:
-        raise TokenInvalidError(detail="Token missing 'sub' claim")
+        raise jwt.JWTError("Token missing 'sub' claim")
 
     # Validate token type
     token_type = payload.get("type", "access")
     if token_type != expected_type:
-        raise TokenInvalidError(
-            detail=f"Invalid token type. Expected {expected_type}, got {token_type}"
-        )
+        raise jwt.JWTError(f"Invalid token type. Expected {expected_type}, got {token_type}")
 
     return TokenPayload(
         sub=sub,

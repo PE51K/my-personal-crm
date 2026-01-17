@@ -11,61 +11,13 @@ from minio import Minio
 from minio.error import S3Error
 
 from app.core.settings import get_settings
-from app.utils.errors import APIError
+from app.utils.errors import FileTooLargeError, FileTypeInvalidError, InternalError, PhotoNotFoundError
 
 # Allowed image MIME types
 ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 # Allowed image extensions
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-
-
-class StorageError(APIError):
-    """Exception raised for storage-related errors."""
-
-    def __init__(self, message: str, status_code: int = 500) -> None:
-        """Initialize storage error.
-
-        Args:
-            message: Error message.
-            status_code: HTTP status code.
-        """
-        super().__init__(
-            message=message,
-            code="STORAGE_ERROR",
-            status_code=status_code,
-        )
-
-
-class FileToolargeError(StorageError):
-    """Exception raised when file is too large."""
-
-    def __init__(self, max_size_mb: int) -> None:
-        """Initialize file too large error.
-
-        Args:
-            max_size_mb: Maximum allowed file size in MB.
-        """
-        super().__init__(
-            message=f"File size exceeds maximum allowed size of {max_size_mb}MB",
-            status_code=413,
-        )
-
-
-class InvalidFileTypeError(StorageError):
-    """Exception raised when file type is invalid."""
-
-    def __init__(self, allowed_types: set[str]) -> None:
-        """Initialize invalid file type error.
-
-        Args:
-            allowed_types: Set of allowed MIME types.
-        """
-        types_str = ", ".join(allowed_types)
-        super().__init__(
-            message=f"Invalid file type. Allowed types: {types_str}",
-            status_code=400,
-        )
 
 
 @lru_cache
@@ -100,7 +52,7 @@ def ensure_bucket_exists() -> None:
     """Ensure that the MinIO bucket exists, create if it doesn't.
 
     Raises:
-        StorageError: If bucket creation fails.
+        InternalError: If bucket creation fails.
     """
     try:
         settings = get_settings()
@@ -110,7 +62,7 @@ def ensure_bucket_exists() -> None:
         if not client.bucket_exists(bucket_name):
             client.make_bucket(bucket_name)
     except S3Error as e:
-        raise StorageError(f"Failed to ensure bucket exists: {e}") from e
+        raise InternalError(f"Failed to ensure bucket exists: {e}") from e
 
 
 def validate_file_size(file: UploadFile) -> None:
@@ -120,7 +72,7 @@ def validate_file_size(file: UploadFile) -> None:
         file: Uploaded file to validate.
 
     Raises:
-        FileToolargeError: If file size exceeds maximum.
+        FileTooLargeError: If file size exceeds maximum.
     """
     # Default max size of 5MB (can be made configurable later)
     max_size_mb = 5
@@ -132,7 +84,7 @@ def validate_file_size(file: UploadFile) -> None:
     file.file.seek(0)  # Seek back to start
 
     if file_size > max_size_bytes:
-        raise FileToolargeError(max_size_mb)
+        raise FileTooLargeError(max_size_mb)
 
 
 def validate_file_type(file: UploadFile) -> None:
@@ -142,17 +94,17 @@ def validate_file_type(file: UploadFile) -> None:
         file: Uploaded file to validate.
 
     Raises:
-        InvalidFileTypeError: If file type is not allowed.
+        FileTypeInvalidError: If file type is not allowed.
     """
     # Check MIME type
     if file.content_type not in ALLOWED_MIME_TYPES:
-        raise InvalidFileTypeError(ALLOWED_MIME_TYPES)
+        raise FileTypeInvalidError(list(ALLOWED_MIME_TYPES))
 
     # Check extension
     if file.filename:
         extension = Path(file.filename).suffix.lower()
         if extension not in ALLOWED_EXTENSIONS:
-            raise InvalidFileTypeError(ALLOWED_MIME_TYPES)
+            raise FileTypeInvalidError(list(ALLOWED_MIME_TYPES))
 
 
 def generate_unique_filename(original_filename: str) -> str:
@@ -180,9 +132,9 @@ async def save_uploaded_file(file: UploadFile, filename: str | None = None) -> s
         Object name (path) where file was saved in MinIO.
 
     Raises:
-        FileToolargeError: If file is too large.
-        InvalidFileTypeError: If file type is not allowed.
-        StorageError: If there's an error saving the file.
+        FileTooLargeError: If file is too large.
+        FileTypeInvalidError: If file type is not allowed.
+        InternalError: If there's an error saving the file.
     """
     # Validate file
     validate_file_size(file)
@@ -216,9 +168,9 @@ async def save_uploaded_file(file: UploadFile, filename: str | None = None) -> s
             content_type=file.content_type or "application/octet-stream",
         )
     except S3Error as e:
-        raise StorageError(f"Failed to save file: {e}") from e
+        raise InternalError(f"Failed to save file: {e}") from e
     except Exception as e:
-        raise StorageError(f"Failed to save file: {e}") from e
+        raise InternalError(f"Failed to save file: {e}") from e
     finally:
         await file.close()
 
@@ -232,7 +184,7 @@ def delete_file(file_path: str) -> None:
         file_path: Object name (path) of file to delete.
 
     Raises:
-        StorageError: If there's an error deleting the file.
+        InternalError: If there's an error deleting the file.
     """
     try:
         settings = get_settings()
@@ -242,9 +194,9 @@ def delete_file(file_path: str) -> None:
         # Delete file from MinIO
         client.remove_object(bucket_name, file_path)
     except S3Error as e:
-        raise StorageError(f"Failed to delete file: {e}") from e
+        raise InternalError(f"Failed to delete file: {e}") from e
     except Exception as e:
-        raise StorageError(f"Failed to delete file: {e}") from e
+        raise InternalError(f"Failed to delete file: {e}") from e
 
 
 def get_file_url(object_name: str, expires_seconds: int = 3600) -> str:
@@ -258,7 +210,8 @@ def get_file_url(object_name: str, expires_seconds: int = 3600) -> str:
         Presigned URL for accessing the file.
 
     Raises:
-        StorageError: If file doesn't exist or URL generation fails.
+        PhotoNotFoundError: If file doesn't exist.
+        InternalError: If URL generation fails.
     """
     try:
         settings = get_settings()
@@ -273,9 +226,9 @@ def get_file_url(object_name: str, expires_seconds: int = 3600) -> str:
         )
         return url
     except S3Error as e:
-        raise StorageError(f"Failed to generate file URL: {e}", status_code=404) from e
+        raise PhotoNotFoundError() from e
     except Exception as e:
-        raise StorageError(f"Failed to generate file URL: {e}") from e
+        raise InternalError(f"Failed to generate file URL: {e}") from e
 
 
 def file_exists(object_name: str) -> bool:
@@ -311,7 +264,8 @@ def get_file_stream(object_name: str) -> BinaryIO:
         Binary stream of the file content.
 
     Raises:
-        StorageError: If file doesn't exist or retrieval fails.
+        PhotoNotFoundError: If file doesn't exist.
+        InternalError: If retrieval fails.
     """
     try:
         settings = get_settings()
@@ -328,6 +282,6 @@ def get_file_stream(object_name: str) -> BinaryIO:
 
         return io.BytesIO(file_data)
     except S3Error as e:
-        raise StorageError(f"File not found: {object_name}", status_code=404) from e
+        raise PhotoNotFoundError() from e
     except Exception as e:
-        raise StorageError(f"Failed to retrieve file: {e}") from e
+        raise InternalError(f"Failed to retrieve file: {e}") from e

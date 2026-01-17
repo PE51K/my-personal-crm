@@ -1,6 +1,6 @@
 """Contacts API endpoints."""
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, File, Query, UploadFile, status
 from fastapi.responses import FileResponse
@@ -19,6 +19,7 @@ from app.schemas.contact import (
     ContactResponse,
     ContactUpdateRequest,
     PhotoUploadResponse,
+    PhotoUrlResponse,
 )
 from app.services.contacts import (
     create_contact,
@@ -265,7 +266,7 @@ async def update_contact_endpoint(
 async def delete_contact_endpoint(
     contact_id: str,
     current_user: CurrentOwner,
-    supabase: SupabaseClient,
+    db: DBSession,
 ) -> None:
     """Delete a contact.
 
@@ -275,12 +276,12 @@ async def delete_contact_endpoint(
     Args:
         contact_id: Contact ID to delete.
         current_user: Current authenticated owner.
-        supabase: Supabase client instance.
+        db: Database session.
 
     Raises:
         ContactNotFoundError: If contact doesn't exist.
     """
-    delete_contact(supabase, contact_id)
+    await delete_contact(db, contact_id)
 
 
 @router.post(
@@ -320,12 +321,12 @@ async def delete_contact_endpoint(
 async def upload_photo_endpoint(
     contact_id: str,
     current_user: CurrentOwner,
-    supabase: SupabaseClient,
+    db: DBSession,
     photo: UploadFile = File(..., description="Photo file"),
 ) -> PhotoUploadResponse:
     """Upload a contact photo.
 
-    Uploads the photo to Supabase Storage and updates the contact's
+    Uploads the photo to MinIO Storage and updates the contact's
     photo_path. Replaces any existing photo.
 
     Constraints:
@@ -335,7 +336,7 @@ async def upload_photo_endpoint(
     Args:
         contact_id: Contact ID to upload photo for.
         current_user: Current authenticated owner.
-        supabase: Supabase client instance.
+        db: Database session.
         photo: Photo file to upload.
 
     Returns:
@@ -347,33 +348,24 @@ async def upload_photo_endpoint(
         FileTypeInvalidError: If file type is not allowed.
     """
     # Verify contact exists
-    get_contact(supabase, contact_id)
+    contact = await get_contact(db, contact_id)
 
-    # Validate content type
-    if photo.content_type not in ALLOWED_CONTENT_TYPES:
-        raise FileTypeInvalidError(list(ALLOWED_CONTENT_TYPES))
+    # Delete old photo if exists
+    if contact.photo_path:
+        try:
+            delete_file(contact.photo_path)
+        except Exception:
+            # Ignore deletion errors (file might not exist)
+            pass
 
-    # Read file content
-    content = await photo.read()
+    # Upload new photo (includes validation)
+    photo_path = await save_uploaded_file(photo)
 
-    # Validate file size
-    if len(content) > MAX_FILE_SIZE:
-        raise FileTooLargeError(max_size_mb=5)
+    # Update contact with new photo path
+    await update_contact(db, contact_id, photo_path=photo_path)
 
-    # Upload photo
-    photo_path = upload_photo(
-        supabase=supabase,
-        contact_id=contact_id,
-        file_content=content,
-        content_type=photo.content_type,
-        filename=photo.filename or "photo.jpg",
-    )
-
-    # Update contact with photo path
-    supabase.table("contacts").update({"photo_path": photo_path}).eq("id", contact_id).execute()
-
-    # Generate signed URL
-    photo_url, _ = get_signed_photo_url(supabase, photo_path)
+    # Generate signed URL (1 hour expiration)
+    photo_url = get_file_url(photo_path, expires_seconds=3600)
 
     return PhotoUploadResponse(photo_path=photo_path, photo_url=photo_url)
 
@@ -392,17 +384,17 @@ async def upload_photo_endpoint(
 async def get_photo_url_endpoint(
     contact_id: str,
     current_user: CurrentOwner,
-    supabase: SupabaseClient,
+    db: DBSession,
 ) -> PhotoUrlResponse:
     """Get a signed URL for the contact's photo.
 
-    Generates a short-lived signed URL (5 minutes) for accessing
+    Generates a short-lived signed URL (1 hour) for accessing
     the contact's photo.
 
     Args:
         contact_id: Contact ID to get photo URL for.
         current_user: Current authenticated owner.
-        supabase: Supabase client instance.
+        db: Database session.
 
     Returns:
         Photo URL response with signed URL and expiration.
@@ -411,11 +403,16 @@ async def get_photo_url_endpoint(
         ContactNotFoundError: If contact doesn't exist.
         PhotoNotFoundError: If contact has no photo.
     """
-    contact = get_contact(supabase, contact_id)
+    contact = await get_contact(db, contact_id)
 
     if not contact.photo_path:
         raise PhotoNotFoundError(contact_id)
 
-    photo_url, expires_at = get_signed_photo_url(supabase, contact.photo_path)
+    # Generate signed URL with 1 hour expiration
+    expires_seconds = 3600
+    photo_url = get_file_url(contact.photo_path, expires_seconds=expires_seconds)
+
+    # Calculate expiration timestamp
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_seconds)
 
     return PhotoUrlResponse(photo_url=photo_url, expires_at=expires_at)
