@@ -2,271 +2,224 @@
 
 A single-user personal CRM application for managing contacts with Kanban-style status tracking and relationship graph visualization.
 
-## Architecture Overview
-
-```
-+------------------------------------------------------------------+
-|                         Docker Compose                            |
-|  +----------------------+    +------------------------------+    |
-|  |      Frontend        |    |          Backend             |    |
-|  |  +----------------+  |    |  +------------------------+  |    |
-|  |  |  React + Vite  |  |    |  |   FastAPI + uvicorn    |  |    |
-|  |  |  (TypeScript)  |  |    |  |      (Python 3.12)     |  |    |
-|  |  +-------+--------+  |    |  +-----------+------------+  |    |
-|  |          |           |    |              |               |    |
-|  |  +-------v--------+  |    |              |               |    |
-|  |  |     Nginx      |--+--->|-->  /api/*   |               |    |
-|  |  |   (port 80)    |  |    |              |               |    |
-|  |  +----------------+  |    |              v               |    |
-|  +----------------------+    |  +------------------------+  |    |
-|                              |  |       Supabase         |  |    |
-|                              |  |  +------+------+----+  |  |    |
-|                              |  |  | Auth |  DB  | S3 |  |  |    |
-|                              |  |  +------+------+----+  |  |    |
-|                              |  +------------------------+  |    |
-|                              +------------------------------+    |
-+------------------------------------------------------------------+
-```
-
-**Key Design Decisions:**
-
-- Backend-only Supabase access: Frontend never communicates directly with Supabase
-- Single-user enforcement: Only one user can be created (bootstrap), enforced at database level
-- JWT verification: Backend verifies Supabase JWTs and checks owner identity on every request
-
-## Prerequisites
-
-- **Docker**: Version 24 or later
-- **Docker Compose**: Version 2.20 or later (required for the `include` directive)
-- **Supabase Project**: A Supabase project with the required tables and storage bucket
-
-### Verifying Docker Compose Version
-
-```bash
-docker compose version
-```
-
-You should see version `2.20.0` or higher. If your version is older, please update Docker Desktop or install a newer version of the Docker Compose plugin.
-
-## Local Development Setup
-
-### 1. Clone the Repository
-
-```bash
-git clone <repository-url>
-cd my-personal-crm
-```
-
-### 2. Configure Environment Variables
-
-Copy the example environment files and fill in your values:
-
-```bash
-# Backend configuration
-cp backend/.env.example backend/.env
-
-# Frontend configuration
-cp frontend/.env.example frontend/.env
-```
-
-Edit `backend/.env` with your Supabase credentials (all found in Supabase Dashboard → Project Settings):
-
-```bash
-# API → Project URL
-SUPABASE_URL=https://your-project.supabase.co
-
-# API → service_role key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
-
-# Database → Connection String → Transaction Mode
-# (only needed for init container to run migrations)
-SUPABASE_DB_URL=postgresql://postgres.your-ref:your-password@aws-0-region.pooler.supabase.com:6543/postgres
-
-# Storage bucket (default: contact-photos)
-SUPABASE_STORAGE_BUCKET=contact-photos
-```
-
-That's it! All other settings have sensible defaults.
-
-### 3. Start the Services
-
-```bash
-docker compose up --build
-```
-
-This will:
-1. Build and run the initialization container that:
-   - Runs all database migrations
-   - Creates the storage bucket for contact photos
-   - Verifies the setup
-2. Build the backend container with Python 3.12 and uv
-3. Build the frontend container with Node 20 and Nginx
-4. Start both services on a shared Docker network
-
-**Note:** The initialization container runs once and exits. The backend API will only start after initialization completes successfully.
-
-### 4. Access the Application
-
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000 (also accessible via http://localhost:3000/api)
-
-## Services
-
-### Backend (api)
-
-- **Technology**: Python 3.12, FastAPI, uvicorn
-- **Port**: 8000 (internal), mapped to host 8000
-- **Features**:
-  - Hot reload enabled for development
-  - Multi-stage Docker build with uv for dependency management
-  - Health check endpoint at `/api/v1/health`
-
-### Frontend (web)
-
-- **Technology**: React 18, TypeScript, Vite, Nginx 1.27
-- **Port**: 80 (internal), mapped to host 3000
-- **Features**:
-  - Multi-stage Docker build (Node for build, Nginx for serving)
-  - API proxy configuration for `/api/*` routes
-  - SPA routing support with try_files fallback
-  - Static asset caching with immutable headers
-
 ## Project Structure
 
 ```
 my-personal-crm/
-+-- docker-compose.yaml          # Root compose with include directive
-+-- README.md                    # This file
-+-- ARCHITECTURE.md              # Detailed architecture specification
-+-- .gitignore
-|
-+-- backend/
-|   +-- docker-compose.yaml      # Backend service definition
-|   +-- Dockerfile               # Python 3.12 + uv multi-stage build
-|   +-- .env.example             # Environment template
-|   +-- pyproject.toml           # Python dependencies
-|   +-- uv.lock                  # Locked dependencies
-|   +-- src/
-|       +-- app/                 # FastAPI application
-|
-+-- frontend/
-    +-- docker-compose.yaml      # Frontend service definition
-    +-- Dockerfile               # Node build + Nginx runtime
-    +-- .env.example             # Environment template
-    +-- nginx/
-    |   +-- default.conf         # Nginx configuration
-    +-- src/                     # React application source
+├── backend/                    # FastAPI backend
+│   ├── src/app/
+│   │   ├── api/               # API endpoints
+│   │   │   └── v1/            # Version 1 routes
+│   │   ├── core/              # Settings and config
+│   │   ├── db/                # Database connection
+│   │   ├── models/            # SQLAlchemy models
+│   │   ├── schemas/           # Pydantic schemas
+│   │   ├── services/          # Business logic
+│   │   └── utils/             # Utilities
+│   ├── alembic/               # Database migrations
+│   ├── Dockerfile
+│   ├── docker-compose.yaml
+│   └── pyproject.toml
+│
+├── frontend/                   # React frontend
+│   ├── src/
+│   │   ├── components/        # React components
+│   │   ├── hooks/             # Custom hooks
+│   │   ├── pages/             # Page components
+│   │   ├── services/          # API clients
+│   │   └── types/             # TypeScript types
+│   ├── nginx/                 # Nginx config
+│   ├── Dockerfile
+│   ├── docker-compose.yaml
+│   └── package.json
+│
+└── docker-compose.yaml         # Root compose file
 ```
 
-## Docker Compose Architecture
+## Running in Development Mode
 
-This project uses the Docker Compose `include` directive to modularize configuration:
+### Prerequisites
 
-```yaml
-# docker-compose.yaml (root)
-include:
-  - path: "backend/docker-compose.yaml"
-    env_file: "backend/.env"
-  - path: "frontend/docker-compose.yaml"
-    env_file: "frontend/.env"
-```
+- Docker and Docker Compose (v2.20+)
+- Git
 
-This approach provides:
-- Clean separation of concerns between services
-- Independent environment variable management per service
-- Easy service toggling for development
+### Setup
 
-## Common Commands
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd my-personal-crm
+   ```
+
+2. **Configure environment variables**
+   ```bash
+   # Backend
+   cp backend/.env.example backend/.env
+   # Edit backend/.env with your configuration
+   
+   # Frontend (optional)
+   cp frontend/.env.example frontend/.env
+   ```
+
+3. **Start databases with Docker**
+   
+   Databases always run in Docker. To start only the databases:
+   ```bash
+   docker compose up db minio -d
+   ```
+
+4. **Run backend locally**
+   ```bash
+   cd backend
+   
+   # Install dependencies with uv
+   uv sync
+   
+   # Run migrations
+   uv run alembic upgrade head
+   
+   # Start the API
+   uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   ```
+
+5. **Run frontend locally**
+   
+   In a new terminal:
+   ```bash
+   cd frontend
+   
+   # Install dependencies
+   npm install
+   
+   # Start dev server
+   npm run dev
+   ```
+
+6. **Access the application**
+   - Frontend: http://localhost:5173
+   - Backend API: http://localhost:8000
+   - API Docs: http://localhost:8000/docs
+   - MinIO Console: http://localhost:9001
+
+### Development Notes
+
+- Databases (PostgreSQL and MinIO) always run in Docker
+- Backend and frontend can run locally for hot reload
+- Database data persists in `volumes/` directory
+- Backend uses `uv` for dependency management
+- Frontend uses Vite for fast HMR
+
+## Running with Docker
+
+To run everything in Docker:
 
 ```bash
 # Start all services
-docker compose up
-
-# Start with rebuild
 docker compose up --build
 
-# Start in detached mode
+# Run in background
 docker compose up -d
 
 # View logs
 docker compose logs -f
-
-# View logs for specific service
-docker compose logs -f api
-docker compose logs -f web
 
 # Stop all services
 docker compose down
 
 # Stop and remove volumes
 docker compose down -v
-
-# Rebuild a specific service
-docker compose build api
-docker compose build web
 ```
 
-## Networking
+### Access Points (Docker Mode)
 
-Both services communicate over a shared Docker network (`personal-crm-network`):
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+- MinIO Console: http://localhost:9001
 
-- The `api` service is accessible to the `web` service via hostname `api`
-- Nginx proxies `/api/*` requests to `http://api:8000`
-- External access is available on ports 3000 (frontend) and 8000 (backend)
+### Docker Architecture
+
+- All volumes are stored locally in their respective service folders
+- PostgreSQL data: `backend/volumes/postgres/`
+- MinIO data: `backend/volumes/minio/`
+- Services communicate via `personal-crm-network` Docker network
 
 ## Environment Variables
 
-### Backend (`backend/.env`)
+### Backend Required Variables
 
-Only 4 variables are required. All others have sensible defaults.
-
-| Variable | Description | Used By | Required |
-|----------|-------------|---------|----------|
-| `SUPABASE_URL` | Supabase project URL | API + Init | ✓ Required |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key | API + Init | ✓ Required |
-| `SUPABASE_DB_URL` | PostgreSQL connection string | Init only (migrations) | ✓ Required |
-| `SUPABASE_STORAGE_BUCKET` | Storage bucket name | API + Init | Optional (default: `contact-photos`) |
-
-**Note:** The backend API uses the Supabase SDK and doesn't directly connect to PostgreSQL. `SUPABASE_DB_URL` is only needed by the initialization container to run SQL migrations via `psql`.
-
-### Frontend (`frontend/.env`)
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_API_BASE_URL` | API base URL | `/api` |
-| `VITE_ENABLE_GRAPH_VIEW` | Enable graph view | `true` |
-| `VITE_ENABLE_CLUSTERING` | Enable clustering | `true` |
-
-## Troubleshooting
-
-### Docker Compose version error
-
-If you see an error about the `include` directive, ensure your Docker Compose version is 2.20 or later:
+Edit `backend/.env`:
 
 ```bash
-docker compose version
+# Database
+POSTGRES_HOST=localhost              # Use 'db' for Docker, 'localhost' for local dev
+POSTGRES_PORT=5432
+POSTGRES_DB=personal_crm
+POSTGRES_USER=crm_user
+POSTGRES_PASSWORD=crm_password
+
+# JWT Security
+JWT_SECRET_KEY=your-secret-key-change-in-production
+
+# MinIO Storage
+MINIO_ENDPOINT=localhost:9000        # Use 'minio:9000' for Docker, 'localhost:9000' for local dev
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET_NAME=contact-photos
 ```
 
-### Port conflicts
+### Frontend Variables (Optional)
 
-If ports 3000 or 8000 are already in use, you can modify the port mappings in the respective `docker-compose.yaml` files.
-
-### Backend health check failing
-
-The backend health check expects a `/api/v1/health` endpoint. Ensure the FastAPI application is properly configured with this endpoint.
-
-### Network connectivity issues
-
-If the frontend cannot reach the backend, verify that both services are on the same network:
+Edit `frontend/.env`:
 
 ```bash
-docker network inspect personal-crm-network
+VITE_API_BASE_URL=/api
 ```
 
-## Contributing
+## Common Commands
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed specifications that all implementing agents must follow.
+```bash
+# Development with databases in Docker
+docker compose up db minio -d        # Start databases only
+cd backend && uv run uvicorn app.main:app --reload
+cd frontend && npm run dev
 
-## License
+# Full Docker deployment
+docker compose up --build            # Build and start all services
+docker compose down                  # Stop all services
 
-[Add your license here]
+# Database management
+docker compose exec db psql -U crm_user -d personal_crm
+cd backend && uv run alembic upgrade head
+cd backend && uv run alembic revision --autogenerate -m "description"
+
+# View logs
+docker compose logs -f api           # Backend logs
+docker compose logs -f web           # Frontend logs
+docker compose logs -f db            # Database logs
+```
+
+## Tech Stack
+
+### Backend
+- Python 3.12
+- FastAPI
+- SQLAlchemy (ORM)
+- Alembic (migrations)
+- PostgreSQL
+- MinIO (S3-compatible storage)
+- JWT authentication
+
+### Frontend
+- React 18
+- TypeScript
+- Vite
+- TailwindCSS
+- React Router
+- Force-Graph (visualization)
+
+### Infrastructure
+- Docker & Docker Compose
+- Nginx (production)
+- PostgreSQL 16
+- MinIO (latest)
