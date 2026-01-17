@@ -7,7 +7,7 @@
  * - Clean, Obsidian-like straight edges
  */
 
-import { type ReactNode, useState, useRef, useEffect, useCallback } from 'react';
+import { type ReactNode, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Graph from 'react-graph-vis';
 import type { GraphResponse, GraphNode } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
@@ -71,8 +71,76 @@ export function GraphView({
   const [isStabilized, setIsStabilized] = useState(false);
   const [graphKey, setGraphKey] = useState(0);
   const nodePositions = useRef<Record<string, { x: number; y: number }>>({});
+  const prevEdgeCountRef = useRef<number>(0);
 
-  // Convert backend data to vis.js format with pending changes applied
+  // Force remount when edge count changes to avoid react-graph-vis patching bugs
+  useEffect(() => {
+    const currentEdgeCount = data?.edges.length || 0;
+    if (prevEdgeCountRef.current !== 0 && prevEdgeCountRef.current !== currentEdgeCount) {
+      setGraphKey(prev => prev + 1);
+    }
+    prevEdgeCountRef.current = currentEdgeCount;
+  }, [data?.edges.length]);
+
+  // Memoize edges to vis.js format with pending changes; used for graphData and for a stable key
+  // that forces Graph remount when the edge set changes (avoids react-graph-vis patchEdges
+  // "duplicate id" error on delete-then-recreate-same-edge).
+  const graphEdges = useMemo(() => {
+    const existingEdges = data?.edges || [];
+    const edgesToDelete = new Set(
+      pendingChanges.filter((c) => c.type === 'delete').map((c) => (c as PendingEdgeDelete).edgeId)
+    );
+    const filteredEdges = existingEdges.filter((edge) => !edgesToDelete.has(edge.id));
+    const pendingAdditions = pendingChanges.filter((c) => c.type === 'add') as PendingEdgeAdd[];
+    const filteredPendingAdditions = pendingAdditions.filter((pending) => {
+      const matchingRealEdge = filteredEdges.find(
+        (edge) =>
+          (edge.source_id === pending.sourceId && edge.target_id === pending.targetId) ||
+          (edge.source_id === pending.targetId && edge.target_id === pending.sourceId)
+      );
+      return !matchingRealEdge;
+    });
+    const pendingEdges = filteredPendingAdditions.map((add) => ({
+      id: add.tempId,
+      source_id: add.sourceId,
+      target_id: add.targetId,
+      label: undefined as string | undefined,
+    }));
+    const allEdges = [...filteredEdges, ...pendingEdges];
+    const seenIds = new Set<string>();
+    const uniqueEdges = allEdges.filter((edge) => {
+      if (seenIds.has(edge.id)) return false;
+      seenIds.add(edge.id);
+      return true;
+    });
+    return uniqueEdges.map((edge) => {
+      const isPending = edge.id.startsWith('pending-');
+      const edgeConfig: Record<string, unknown> = {
+        id: edge.id,
+        from: edge.source_id,
+        to: edge.target_id,
+        smooth: false,
+        color: {
+          color: isPending ? '#FCD34D' : '#9CA3AF',
+          highlight: '#818CF8',
+          hover: '#818CF8',
+          opacity: isPending ? 0.8 : 0.6,
+        },
+        width: isPending ? 2 : 1.5,
+        dashes: isPending,
+        font: {
+          color: '#E5E7EB',
+          size: 12,
+          background: '#374151',
+          strokeWidth: 0,
+        },
+      };
+      if (edge.label) edgeConfig.label = edge.label;
+      return edgeConfig;
+    });
+  }, [data?.edges, pendingChanges]);
+
+  // Convert backend data to vis.js format (nodes) and use memoized edges
   const graphData = {
     nodes: data?.nodes.map((node) => {
       const fullName = `${node.first_name} ${node.last_name || ''}`.trim();
@@ -111,88 +179,15 @@ export function GraphView({
       }
 
       // Apply stored positions if available (only after stabilization)
-      if (isStabilized && nodePositions.current[node.id]) {
-        nodeConfig.x = nodePositions.current[node.id].x;
-        nodeConfig.y = nodePositions.current[node.id].y;
+      const pos = nodePositions.current[node.id];
+      if (isStabilized && pos) {
+        nodeConfig.x = pos.x;
+        nodeConfig.y = pos.y;
       }
 
       return nodeConfig;
     }) || [],
-    edges: (() => {
-      // Start with existing edges
-      const existingEdges = data?.edges || [];
-
-      // Filter out edges marked for deletion
-      const edgesToDelete = new Set(
-        pendingChanges.filter((c) => c.type === 'delete').map((c) => (c as PendingEdgeDelete).edgeId)
-      );
-      const filteredEdges = existingEdges.filter((edge) => !edgesToDelete.has(edge.id));
-
-      // Get pending additions
-      const pendingAdditions = pendingChanges.filter((c) => c.type === 'add') as PendingEdgeAdd[];
-
-      // Filter out pending additions that now exist as real edges (to prevent duplicates after save)
-      const filteredPendingAdditions = pendingAdditions.filter((pending) => {
-        const matchingRealEdge = filteredEdges.find(
-          (edge) =>
-            (edge.source_id === pending.sourceId && edge.target_id === pending.targetId) ||
-            (edge.source_id === pending.targetId && edge.target_id === pending.sourceId)
-        );
-        return !matchingRealEdge;
-      });
-
-      // Convert pending additions to edge format
-      const pendingEdges = filteredPendingAdditions.map((add) => ({
-        id: add.tempId,
-        source_id: add.sourceId,
-        target_id: add.targetId,
-        label: undefined,
-      }));
-
-      // Combine edges
-      const allEdges = [...filteredEdges, ...pendingEdges];
-
-      // Deduplicate by ID as a safety measure
-      const seenIds = new Set<string>();
-      const uniqueEdges = allEdges.filter((edge) => {
-        if (seenIds.has(edge.id)) {
-          return false;
-        }
-        seenIds.add(edge.id);
-        return true;
-      });
-
-      return uniqueEdges.map((edge) => {
-        const isPending = edge.id.startsWith('pending-');
-        const edgeConfig: any = {
-          id: edge.id,
-          from: edge.source_id,
-          to: edge.target_id,
-          smooth: false, // Straight edges
-          color: {
-            color: isPending ? '#FCD34D' : '#9CA3AF', // Yellow for pending
-            highlight: '#818CF8',
-            hover: '#818CF8',
-            opacity: isPending ? 0.8 : 0.6,
-          },
-          width: isPending ? 2 : 1.5,
-          dashes: isPending, // Dashed line for pending edges
-          font: {
-            color: '#E5E7EB',
-            size: 12,
-            background: '#374151',
-            strokeWidth: 0,
-          },
-        };
-
-        // Only add label if it exists
-        if (edge.label) {
-          edgeConfig.label = edge.label;
-        }
-
-        return edgeConfig;
-      });
-    })(),
+    edges: graphEdges as any,
   };
 
   // Graph options for Obsidian-like appearance
@@ -351,11 +346,18 @@ export function GraphView({
       });
     }
 
+    // Store local copy of pending changes and clear immediately to prevent duplicate rendering
+    const changesToProcess = [...pendingChanges];
+    setPendingChanges([]);
+    setNetwork(null);
+    setIsStabilized(true);
+    setGraphKey(prev => prev + 1);
+
     // Consolidate pending changes to avoid duplicate operations
     const edgesToCreate = new Map<string, { sourceId: string; targetId: string }>();
     const edgesToDelete = new Set<string>();
 
-    for (const change of pendingChanges) {
+    for (const change of changesToProcess) {
       if (change.type === 'add') {
         const add = change as PendingEdgeAdd;
         // Create a normalized key for the edge (sorted to handle bidirectional)
@@ -373,6 +375,19 @@ export function GraphView({
     // Apply all changes and wait for them to complete
     const promises: Promise<any>[] = [];
 
+    // Delete edges first to avoid conflicts
+    for (const edgeId of edgesToDelete) {
+      promises.push(
+        Promise.resolve(onEdgeDelete(edgeId)).catch((err) => {
+          console.error('Failed to delete edge:', err);
+        })
+      );
+    }
+
+    // Wait for deletions to complete before creating new edges
+    await Promise.all(promises);
+    promises.length = 0;
+
     // Create edges
     for (const edge of edgesToCreate.values()) {
       promises.push(
@@ -382,23 +397,8 @@ export function GraphView({
       );
     }
 
-    // Delete edges
-    for (const edgeId of edgesToDelete) {
-      promises.push(
-        Promise.resolve(onEdgeDelete(edgeId)).catch((err) => {
-          console.error('Failed to delete edge:', err);
-        })
-      );
-    }
-
     // Wait for all mutations to complete
     await Promise.all(promises);
-
-    // Clear pending changes and force graph remount to avoid react-graph-vis patching bugs
-    setPendingChanges([]);
-    setNetwork(null);
-    setIsStabilized(true); // Mark as stabilized so positions are applied on remount
-    setGraphKey(prev => prev + 1);
   }, [pendingChanges, onEdgeCreate, onEdgeDelete, network, data?.nodes]);
 
   // Handler to discard all pending changes
@@ -424,7 +424,7 @@ export function GraphView({
   // Event handlers
   const events = {
     select: (event: any) => {
-      const { nodes, edges } = event;
+      const { nodes } = event;
 
       if (edgeCreationMode && nodes.length > 0) {
         const clickedNodeId = nodes[0];
@@ -490,7 +490,10 @@ export function GraphView({
 
       // Only set up stabilization callback if we don't already have positions
       if (!isStabilized || Object.keys(nodePositions.current).length === 0) {
-        // Fit view and capture positions after stabilization
+        // Fit view and capture positions after stabilization; keep physics enabled
+        // (we used to disable physics here, but it was then re-enabled when options
+        // changed on mode toggle—react-graph-vis does setOptions(nextProps.options).
+        // Leaving physics on avoids the "works only after toggling mode" behavior.)
         networkInstance.once('stabilizationIterationsDone', () => {
           networkInstance.fit({
             animation: {
@@ -499,7 +502,6 @@ export function GraphView({
             },
           });
 
-          // Capture node positions and disable physics after animation completes
           setTimeout(() => {
             if (data?.nodes) {
               data.nodes.forEach((node) => {
@@ -509,19 +511,11 @@ export function GraphView({
                 }
               });
               setIsStabilized(true);
-
-              // Disable physics to prevent unwanted movement
-              networkInstance.setOptions({
-                physics: { enabled: false },
-              });
             }
-          }, 600); // Wait for fit animation to complete
+          }, 600);
         });
       } else {
-        // Already have positions, disable physics and fit the view
-        networkInstance.setOptions({
-          physics: { enabled: false },
-        });
+        // Already have positions (remount), fit the view
         setTimeout(() => {
           networkInstance.fit({
             animation: {
@@ -703,7 +697,7 @@ export function GraphView({
 
       {/* Graph */}
       <Graph
-        key={graphKey}
+        key={`${graphKey}-${graphEdges.map((e) => String(e.id)).sort().join(',')}`}
         graph={graphData}
         options={options}
         events={events}

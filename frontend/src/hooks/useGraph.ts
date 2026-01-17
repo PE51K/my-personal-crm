@@ -41,37 +41,9 @@ export function useCreateEdge() {
 
   return useMutation({
     mutationFn: (data: EdgeCreateRequest) => createEdge(data),
-    onSuccess: (newEdge) => {
-      // Optimistically add edge to graph (with deduplication)
-      queryClient.setQueryData<GraphResponse>(graphKeys.data(), (old) => {
-        if (!old) return old;
-
-        // Check if edge already exists (by ID or by source/target pair)
-        const edgeExists = old.edges.some(
-          (edge) =>
-            edge.id === newEdge.id ||
-            (edge.source_id === newEdge.source_id && edge.target_id === newEdge.target_id) ||
-            (edge.source_id === newEdge.target_id && edge.target_id === newEdge.source_id)
-        );
-
-        if (edgeExists) {
-          return old; // Don't add duplicate
-        }
-
-        return {
-          ...old,
-          edges: [
-            ...old.edges,
-            {
-              id: newEdge.id,
-              source_id: newEdge.source_id,
-              target_id: newEdge.target_id,
-              label: newEdge.label,
-            },
-          ],
-        };
-      });
-      // Invalidate contacts as associations may have changed
+    onSuccess: () => {
+      // Invalidate and refetch graph data to ensure clean state
+      void queryClient.invalidateQueries({ queryKey: graphKeys.data() });
       void queryClient.invalidateQueries({ queryKey: contactKeys.details() });
     },
   });
@@ -85,16 +57,9 @@ export function useDeleteEdge() {
 
   return useMutation({
     mutationFn: (id: string) => deleteEdge(id),
-    onSuccess: (_data, deletedId) => {
-      // Remove edge from cache
-      queryClient.setQueryData<GraphResponse>(graphKeys.data(), (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          edges: old.edges.filter((edge) => edge.id !== deletedId),
-        };
-      });
-      // Invalidate contacts
+    onSuccess: () => {
+      // Invalidate and refetch graph data to ensure clean state
+      void queryClient.invalidateQueries({ queryKey: graphKeys.data() });
       void queryClient.invalidateQueries({ queryKey: contactKeys.details() });
     },
   });
