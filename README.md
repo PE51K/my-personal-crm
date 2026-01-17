@@ -75,7 +75,7 @@ my-personal-crm/
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/PE51K/my-personal-crm
    cd my-personal-crm
    ```
 
@@ -203,6 +203,10 @@ JWT_SECRET_KEY=your-secret-key-change-in-production
 Edit `frontend/.env`:
 
 ```bash
+# Docker Configuration
+FRONTEND_PORT=3000              # Port for frontend service (default: 3000)
+
+# API Configuration
 VITE_API_BASE_URL=/api
 ```
 
