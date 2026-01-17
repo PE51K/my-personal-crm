@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):  # noqa: ANN201
 
     # Initialize database and storage
     try:
-        initialize_app(settings)
+        await initialize_app(settings)
     except Exception as e:
         logger.error("Failed to initialize application: %s", e)
         raise

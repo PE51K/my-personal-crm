@@ -107,7 +107,7 @@ async def verify_database_connection(settings: Settings) -> None:
         raise
 
 
-def initialize_app(settings: Settings) -> None:
+async def initialize_app(settings: Settings) -> None:
     """Initialize application on startup.
 
     Runs database migrations and sets up storage directory.
@@ -124,8 +124,9 @@ def initialize_app(settings: Settings) -> None:
     logger.info("")
 
     try:
-        # Run Alembic migrations
-        run_alembic_migrations()
+        # Skip migrations - run them manually with: uv run alembic upgrade head
+        # run_alembic_migrations()
+        logger.info("Skipping automatic migrations (run manually if needed)")
         logger.info("")
 
         # Set up storage directory
@@ -133,7 +134,7 @@ def initialize_app(settings: Settings) -> None:
         logger.info("")
 
         # Verify database setup
-        asyncio.run(verify_database_connection(settings))
+        await verify_database_connection(settings)
         logger.info("")
 
         logger.info("============================================")

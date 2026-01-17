@@ -329,6 +329,9 @@ async def create_contact(
     )
     db.add(contact)
     await db.flush()
+    
+    # Refresh contact to load lazy-loaded collections for async context
+    await db.refresh(contact, attribute_names=["tags", "interests", "occupations"])
 
     # Load and associate tags
     if processed_tag_ids:

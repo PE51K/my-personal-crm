@@ -2,6 +2,7 @@
 
 import io
 import uuid
+from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import BinaryIO
@@ -218,11 +219,11 @@ def get_file_url(object_name: str, expires_seconds: int = 3600) -> str:
         bucket_name = settings.s3.bucket_name
         client = get_minio_client()
 
-        # Generate presigned URL
+        # Generate presigned URL (MinIO expects timedelta, not int)
         url = client.presigned_get_object(
             bucket_name=bucket_name,
             object_name=object_name,
-            expires=expires_seconds,
+            expires=timedelta(seconds=expires_seconds),
         )
         return url
     except S3Error as e:

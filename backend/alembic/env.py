@@ -26,7 +26,7 @@ target_metadata = Base.metadata
 
 # Get database URL from settings
 db_settings = DatabaseSettings()
-config.set_main_option("sqlalchemy.url", db_settings.ASYNC_DATABASE_URL)
+config.set_main_option("sqlalchemy.url", db_settings.async_url)
 
 
 def run_migrations_offline() -> None:
