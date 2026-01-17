@@ -10,6 +10,7 @@ import { SetupPage } from '@/pages/SetupPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { AddContactPage } from '@/pages/AddContactPage';
+import { ContactsPage } from '@/pages/ContactsPage';
 import { KanbanPage } from '@/pages/KanbanPage';
 import { GraphPage } from '@/pages/GraphPage';
 
@@ -71,6 +72,14 @@ export default function App(): React.JSX.Element {
               element={
                 <ProtectedRoute>
                   <AddContactPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/contacts"
+              element={
+                <ProtectedRoute>
+                  <ContactsPage />
                 </ProtectedRoute>
               }
             />

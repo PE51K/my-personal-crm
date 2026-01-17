@@ -150,6 +150,7 @@ export interface ContactListItem {
   photo_url: string | null;
   tags: Tag[];
   created_at: string;
+  sort_order_in_status?: number;
 }
 
 /**

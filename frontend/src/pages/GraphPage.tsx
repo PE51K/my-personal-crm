@@ -52,7 +52,7 @@ export function GraphPage(): ReactNode {
           </div>
         </div>
 
-        <div className="flex-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="flex-1 bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
           <GraphView
             data={data}
             isLoading={isLoading}

@@ -76,6 +76,8 @@ export function useCreateContact() {
     mutationFn: (data: ContactCreateRequest) => createContact(data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: contactKeys.lists() });
+      // Invalidate statuses to update contact counts
+      void queryClient.invalidateQueries({ queryKey: ['statuses'] });
     },
   });
 }
@@ -97,6 +99,8 @@ export function useUpdateContact() {
       );
       // Invalidate lists to refresh
       void queryClient.invalidateQueries({ queryKey: contactKeys.lists() });
+      // Invalidate statuses to update contact counts
+      void queryClient.invalidateQueries({ queryKey: ['statuses'] });
     },
   });
 }
@@ -114,6 +118,8 @@ export function useDeleteContact() {
       queryClient.removeQueries({ queryKey: contactKeys.detail(id) });
       // Invalidate lists
       void queryClient.invalidateQueries({ queryKey: contactKeys.lists() });
+      // Invalidate statuses to update contact counts
+      void queryClient.invalidateQueries({ queryKey: ['statuses'] });
     },
   });
 }

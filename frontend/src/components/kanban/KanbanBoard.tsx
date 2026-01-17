@@ -49,7 +49,7 @@ export function KanbanBoard({
     })
   );
 
-  // Group contacts by status
+  // Group contacts by status and sort by position
   const contactsByStatus = useMemo(() => {
     const grouped = new Map<string, ContactListItem[]>();
     
@@ -58,6 +58,9 @@ export function KanbanBoard({
       grouped.set(status.id, []);
     });
 
+    // Add a special "no-status" group for contacts without status
+    grouped.set('no-status', []);
+
     // Group contacts
     contacts.forEach((contact) => {
       const statusId = contact.status?.id;
@@ -65,7 +68,22 @@ export function KanbanBoard({
         const statusContacts = grouped.get(statusId) ?? [];
         statusContacts.push(contact);
         grouped.set(statusId, statusContacts);
+      } else {
+        // Contacts without status go to the "no-status" group
+        const noStatusContacts = grouped.get('no-status') ?? [];
+        noStatusContacts.push(contact);
+        grouped.set('no-status', noStatusContacts);
       }
+    });
+
+    // Sort contacts within each status by sort_order_in_status
+    grouped.forEach((contactList, statusId) => {
+      contactList.sort((a, b) => {
+        const orderA = a.sort_order_in_status ?? 0;
+        const orderB = b.sort_order_in_status ?? 0;
+        return orderA - orderB;
+      });
+      grouped.set(statusId, contactList);
     });
 
     return grouped;
@@ -125,6 +143,19 @@ export function KanbanBoard({
     );
   }
 
+  // Create a virtual "No Status" status object
+  const noStatus: StatusFull = {
+    id: 'no-status',
+    name: 'No Status',
+    sort_order: -1, // Display first
+    is_active: true,
+    contact_count: contactsByStatus.get('no-status')?.length ?? 0,
+  };
+
+  // Filter only active statuses and combine with no-status
+  const activeStatuses = statuses.filter((status) => status.is_active);
+  const allStatuses = [noStatus, ...activeStatuses];
+
   return (
     <DndContext
       sensors={sensors}
@@ -134,7 +165,7 @@ export function KanbanBoard({
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-4 overflow-x-auto pb-4">
-        {statuses.map((status) => (
+        {allStatuses.map((status) => (
           <KanbanColumn
             key={status.id}
             status={status}

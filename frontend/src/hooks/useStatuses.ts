@@ -58,6 +58,7 @@ export function useCreateStatus() {
   return useMutation({
     mutationFn: (data: StatusCreateRequest) => createStatus(data),
     onSuccess: () => {
+      // Refetch to get the new status with proper ID and order
       void queryClient.invalidateQueries({ queryKey: statusKeys.lists() });
     },
   });
@@ -72,8 +73,42 @@ export function useUpdateStatus() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: StatusUpdateRequest }) =>
       updateStatus(id, data),
+    onMutate: async (variables) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: statusKeys.lists() });
+
+      // Snapshot previous value for rollback
+      const previousStatuses = queryClient.getQueriesData<{ data: StatusFull[] }>({
+        queryKey: statusKeys.lists(),
+      });
+
+      // Optimistically update status in cache
+      queryClient.setQueriesData<{ data: StatusFull[] }>(
+        { queryKey: statusKeys.lists() },
+        (old) => {
+          if (!old) return old;
+          return {
+            data: old.data.map((s) =>
+              s.id === variables.id
+                ? { ...s, ...variables.data }
+                : s
+            ),
+          };
+        }
+      );
+
+      return { previousStatuses };
+    },
+    onError: (_err, _variables, context) => {
+      // Rollback on error
+      if (context?.previousStatuses) {
+        for (const [queryKey, data] of context.previousStatuses) {
+          queryClient.setQueryData(queryKey, data);
+        }
+      }
+    },
     onSuccess: (updatedStatus) => {
-      // Update in cache
+      // Update in cache with server response
       queryClient.setQueriesData<{ data: StatusFull[] }>(
         { queryKey: statusKeys.lists() },
         (old) => {
@@ -85,6 +120,9 @@ export function useUpdateStatus() {
           };
         }
       );
+      
+      // Also invalidate to ensure both cache entries are refreshed
+      void queryClient.invalidateQueries({ queryKey: statusKeys.lists() });
     },
   });
 }
@@ -97,7 +135,50 @@ export function useReorderStatuses() {
 
   return useMutation({
     mutationFn: (data: StatusReorderRequest) => reorderStatuses(data),
+    onMutate: async (variables) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: statusKeys.lists() });
+
+      // Snapshot previous value for rollback
+      const previousStatuses = queryClient.getQueriesData<{ data: StatusFull[] }>({
+        queryKey: statusKeys.lists(),
+      });
+
+      // Optimistically update status order in cache
+      queryClient.setQueriesData<{ data: StatusFull[] }>(
+        { queryKey: statusKeys.lists() },
+        (old) => {
+          if (!old) return old;
+
+          // Create a map for quick lookup
+          const statusMap = new Map(old.data.map((s) => [s.id, s]));
+          
+          // Reorder based on the new order array
+          const reorderedData = variables.order
+            .map((id, index) => {
+              const status = statusMap.get(id);
+              return status ? { ...status, sort_order: index } : null;
+            })
+            .filter((s): s is StatusFull => s !== null);
+
+          return {
+            data: reorderedData,
+          };
+        }
+      );
+
+      return { previousStatuses };
+    },
+    onError: (_err, _variables, context) => {
+      // Rollback on error
+      if (context?.previousStatuses) {
+        for (const [queryKey, data] of context.previousStatuses) {
+          queryClient.setQueryData(queryKey, data);
+        }
+      }
+    },
     onSuccess: () => {
+      // Refetch to ensure consistency
       void queryClient.invalidateQueries({ queryKey: statusKeys.lists() });
     },
   });
@@ -111,6 +192,36 @@ export function useDeleteStatus() {
 
   return useMutation({
     mutationFn: (id: string) => deleteStatus(id),
+    onMutate: async (variables) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: statusKeys.lists() });
+
+      // Snapshot previous value for rollback
+      const previousStatuses = queryClient.getQueriesData<{ data: StatusFull[] }>({
+        queryKey: statusKeys.lists(),
+      });
+
+      // Optimistically remove status from cache
+      queryClient.setQueriesData<{ data: StatusFull[] }>(
+        { queryKey: statusKeys.lists() },
+        (old) => {
+          if (!old) return old;
+          return {
+            data: old.data.filter((s) => s.id !== variables),
+          };
+        }
+      );
+
+      return { previousStatuses };
+    },
+    onError: (_err, _variables, context) => {
+      // Rollback on error
+      if (context?.previousStatuses) {
+        for (const [queryKey, data] of context.previousStatuses) {
+          queryClient.setQueryData(queryKey, data);
+        }
+      }
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: statusKeys.lists() });
     },
