@@ -32,6 +32,7 @@ from app.schemas.contact import (
     OccupationInput,
     PaginationMeta,
     StatusBase,
+    StatusInput,
     TagBase,
     TagInput,
 )
@@ -167,6 +168,56 @@ async def _process_occupations(
     return occupation_ids
 
 
+async def _process_status(
+    db: AsyncSession,
+    status_input: str | StatusInput | None,
+) -> UUID | None:
+    """Process status input and return valid status UUID.
+
+    Creates new status for temp IDs and returns real UUID.
+
+    Args:
+        db: Database session instance.
+        status_input: Status ID string or StatusInput object.
+
+    Returns:
+        Valid status UUID or None if no status provided.
+
+    Raises:
+        StatusNotFoundError: If status_id is invalid (not temp and not found).
+    """
+    if not status_input:
+        return None
+
+    if isinstance(status_input, str):
+        # String ID - check if temp or real
+        if _is_temp_id(status_input):
+            logger.warning("Received temp status ID without name: %s", status_input)
+            return None
+        # Validate that status exists
+        result = await db.execute(select(Status).where(Status.id == UUID(status_input)))
+        if not result.scalar_one_or_none():
+            raise StatusNotFoundError(status_input)
+        return UUID(status_input)
+    else:
+        # StatusInput object
+        if _is_temp_id(status_input.id):
+            # Create new status
+            # Get max sort_order to place new status at the end
+            result = await db.execute(select(func.max(Status.sort_order)))
+            max_sort_order = result.scalar() or 0
+            new_status = Status(name=status_input.name, sort_order=max_sort_order + 1, is_active=True)
+            db.add(new_status)
+            await db.flush()
+            return new_status.id
+        else:
+            # Validate that status exists
+            result = await db.execute(select(Status).where(Status.id == UUID(status_input.id)))
+            if not result.scalar_one_or_none():
+                raise StatusNotFoundError(status_input.id)
+            return UUID(status_input.id)
+
+
 async def _build_contact_response(
     db: AsyncSession,
     contact: Contact,
@@ -268,7 +319,7 @@ async def create_contact(
     linkedin_url: str | None = None,
     github_username: str | None = None,
     met_at: date | None = None,
-    status_id: str | None = None,
+    status_id: str | StatusInput | None = None,
     notes: str | None = None,
     tag_ids: list[str | TagInput] | None = None,
     interest_ids: list[str | InterestInput] | None = None,
@@ -299,11 +350,8 @@ async def create_contact(
     Raises:
         StatusNotFoundError: If status_id is invalid.
     """
-    # Validate status_id if provided
-    if status_id:
-        result = await db.execute(select(Status).where(Status.id == UUID(status_id)))
-        if not result.scalar_one_or_none():
-            raise StatusNotFoundError(status_id)
+    # Process status input (create new status if needed)
+    processed_status_id = await _process_status(db, status_id)
 
     # Process tag/interest/occupation inputs (create new ones if needed)
     processed_tag_ids = await _process_tags(db, tag_ids)
@@ -319,7 +367,7 @@ async def create_contact(
         linkedin_url=str(linkedin_url) if linkedin_url else None,
         github_username=github_username,
         met_at=met_at,
-        status_id=UUID(status_id) if status_id else None,
+        status_id=processed_status_id,
         notes=notes,
     )
     db.add(contact)
@@ -622,7 +670,7 @@ async def update_contact(
     linkedin_url: str | None = None,
     github_username: str | None = None,
     met_at: date | None = None,
-    status_id: str | None = None,
+    status_id: str | StatusInput | None = None,
     notes: str | None = None,
     photo_path: str | None = None,
     tag_ids: list[str | TagInput] | None = None,
@@ -671,11 +719,10 @@ async def update_contact(
     if not contact:
         raise ContactNotFoundError(contact_id)
 
-    # Validate status_id if provided
-    if status_id:
-        status_result = await db.execute(select(Status).where(Status.id == UUID(status_id)))
-        if not status_result.scalar_one_or_none():
-            raise StatusNotFoundError(status_id)
+    # Process status input if provided (create new status if needed)
+    processed_status_id = None
+    if status_id is not None:
+        processed_status_id = await _process_status(db, status_id)
 
     # Update basic fields (only if non-None)
     if first_name is not None:
@@ -693,7 +740,7 @@ async def update_contact(
     if met_at is not None:
         contact.met_at = met_at
     if status_id is not None:
-        contact.status_id = UUID(status_id)
+        contact.status_id = processed_status_id
     if notes is not None:
         contact.notes = notes
     if photo_path is not None:

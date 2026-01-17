@@ -74,6 +74,11 @@ export interface OccupationInput {
   name: string;
 }
 
+export interface StatusInput {
+  id: string;
+  name: string;
+}
+
 /**
  * Contact creation request
  */
@@ -85,7 +90,7 @@ export interface ContactCreateRequest {
   linkedin_url?: string | null;
   github_username?: string | null;
   met_at?: string | null; // ISO date string
-  status_id?: string | null;
+  status_id?: string | StatusInput | null;
   notes?: string | null;
   tag_ids?: (string | TagInput)[];
   interest_ids?: (string | InterestInput)[];
@@ -104,7 +109,7 @@ export interface ContactUpdateRequest {
   linkedin_url?: string | null;
   github_username?: string | null;
   met_at?: string | null;
-  status_id?: string | null;
+  status_id?: string | StatusInput | null;
   notes?: string | null;
   tag_ids?: (string | TagInput)[];
   interest_ids?: (string | InterestInput)[];

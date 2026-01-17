@@ -1,8 +1,9 @@
 """Contact request and response schemas."""
 
 from datetime import date, datetime
+from typing import Any
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 
 class TagBase(BaseModel):
@@ -115,6 +116,18 @@ class OccupationInput(BaseModel):
     name: str
 
 
+class StatusInput(BaseModel):
+    """Status input for creating/linking statuses.
+
+    Attributes:
+        id: Status ID (can be temp ID like 'temp-123' or real UUID).
+        name: Status name (required for temp IDs).
+    """
+
+    id: str
+    name: str
+
+
 class ContactCreateRequest(BaseModel):
     """Request to create a contact.
 
@@ -126,7 +139,7 @@ class ContactCreateRequest(BaseModel):
         linkedin_url: LinkedIn profile URL.
         github_username: GitHub username.
         met_at: Date when the contact was met.
-        status_id: Status ID for the contact.
+        status_id: Status ID or StatusInput object for the contact (supports temp IDs).
         notes: Additional notes.
         tag_ids: List of tag IDs or objects to associate (supports temp IDs).
         interest_ids: List of interest IDs or objects to associate (supports temp IDs).
@@ -141,8 +154,24 @@ class ContactCreateRequest(BaseModel):
     linkedin_url: HttpUrl | None = None
     github_username: str | None = Field(default=None, max_length=100)
     met_at: date | None = None
-    status_id: str | None = None
+    status_id: StatusInput | str | None = None
     notes: str | None = None
+
+    @field_validator("status_id", mode="before")
+    @classmethod
+    def validate_status_id(cls, v: Any) -> Any:
+        """Validate status_id - accept string or dict (StatusInput)."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return v
+        if isinstance(v, dict):
+            # Convert dict to StatusInput
+            return StatusInput(**v)
+        if isinstance(v, StatusInput):
+            # Already a StatusInput instance
+            return v
+        return v
     tag_ids: list[str | TagInput] = Field(default_factory=list)
     interest_ids: list[str | InterestInput] = Field(default_factory=list)
     occupation_ids: list[str | OccupationInput] = Field(default_factory=list)
@@ -160,7 +189,7 @@ class ContactUpdateRequest(BaseModel):
         linkedin_url: LinkedIn profile URL.
         github_username: GitHub username.
         met_at: Date when the contact was met.
-        status_id: Status ID for the contact.
+        status_id: Status ID or StatusInput object for the contact (supports temp IDs).
         notes: Additional notes.
         tag_ids: List of tag IDs or objects to associate (supports temp IDs).
         interest_ids: List of interest IDs or objects to associate (supports temp IDs).
@@ -175,9 +204,25 @@ class ContactUpdateRequest(BaseModel):
     linkedin_url: HttpUrl | None = None
     github_username: str | None = Field(default=None, max_length=100)
     met_at: date | None = None
-    status_id: str | None = None
+    status_id: StatusInput | str | None = None
     notes: str | None = None
     tag_ids: list[str | TagInput] | None = None
+
+    @field_validator("status_id", mode="before")
+    @classmethod
+    def validate_status_id(cls, v: Any) -> Any:
+        """Validate status_id - accept string or dict (StatusInput)."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return v
+        if isinstance(v, dict):
+            # Convert dict to StatusInput
+            return StatusInput(**v)
+        if isinstance(v, StatusInput):
+            # Already a StatusInput instance
+            return v
+        return v
     interest_ids: list[str | InterestInput] | None = None
     occupation_ids: list[str | OccupationInput] | None = None
     association_contact_ids: list[str] | None = None

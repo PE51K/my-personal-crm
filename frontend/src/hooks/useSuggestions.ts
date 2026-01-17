@@ -61,21 +61,18 @@ export function useOccupationSuggestions(query: string, limit = 10) {
 
 /**
  * Hook to get filtered status suggestions (client-side filtering)
- * Only returns active statuses for use in forms
+ * Returns all statuses (including inactive) for use in forms
  */
 export function useStatusSuggestions(query: string) {
-  const { data: statusesResponse, isLoading } = useStatuses(false); // Only active statuses
+  const { data: statusesResponse, isLoading } = useStatuses(true); // Include inactive statuses
   const statuses = statusesResponse?.data ?? [];
 
   const filteredStatuses = useMemo(() => {
-    // Filter to only active statuses
-    const activeStatuses = statuses.filter((s) => s.is_active);
-    
     if (!query.trim()) {
-      return activeStatuses.map((s) => ({ id: s.id, name: s.name }));
+      return statuses.map((s) => ({ id: s.id, name: s.name }));
     }
     const lowerQuery = query.toLowerCase();
-    return activeStatuses
+    return statuses
       .filter((s) => s.name.toLowerCase().includes(lowerQuery))
       .map((s) => ({ id: s.id, name: s.name }));
   }, [statuses, query]);

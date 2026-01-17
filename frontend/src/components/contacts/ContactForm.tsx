@@ -30,6 +30,7 @@ import type {
   Interest,
   Occupation,
   Status,
+  StatusInput,
 } from '@/types';
 
 interface ContactFormProps {
@@ -168,6 +169,13 @@ export function ContactForm({
         return;
       }
 
+      // Send status as object if it's a new status (temp ID), otherwise as string ID
+      const statusId: string | StatusInput | null = selectedStatus
+        ? selectedStatus.id.startsWith('temp-')
+          ? { id: selectedStatus.id, name: selectedStatus.name }
+          : selectedStatus.id
+        : null;
+
       const data: ContactCreateRequest | ContactUpdateRequest = {
         first_name: formData.first_name.trim(),
         middle_name: formData.middle_name.trim() || null,
@@ -176,7 +184,7 @@ export function ContactForm({
         linkedin_url: formData.linkedin_url.trim() || null,
         github_username: formData.github_username.trim() || null,
         met_at: formData.met_at || null,
-        status_id: selectedStatus?.id ?? null,
+        status_id: statusId,
         notes: formData.notes.trim() || null,
         // Send full objects (with id and name) to support temp IDs
         tag_ids: selectedTags.map((t) => ({ id: t.id, name: t.name })),
