@@ -7,6 +7,7 @@ export interface SuggestionItem {
   id: string;
   name: string;
   usage_count: number;
+  occupation_id?: string | null;
 }
 
 /**

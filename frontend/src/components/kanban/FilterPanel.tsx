@@ -1,74 +1,153 @@
 /**
- * Filter panel for Kanban board
+ * Filter panel for contacts page
  */
 
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Badge } from '@/components/ui/Badge';
+import { Autocomplete } from '@/components/ui/Autocomplete';
 import {
   useTagSuggestions,
   useInterestSuggestions,
   useOccupationSuggestions,
+  usePositionSuggestions,
+  useStatusSuggestions,
 } from '@/hooks/useSuggestions';
-import type { ContactListParams } from '@/types';
+import type { ContactListParams, Tag, Interest, Occupation, Position, Status } from '@/types';
 
 interface FilterPanelProps {
   filters: ContactListParams;
   onFiltersChange: (filters: ContactListParams) => void;
+  showStatusFilter?: boolean; // Only show status filter on contacts page
 }
 
 export function FilterPanel({
   filters,
   onFiltersChange,
+  showStatusFilter = false,
 }: FilterPanelProps): ReactNode {
   const [searchTerm, setSearchTerm] = useState(filters.search ?? '');
-  const [createdFrom, setCreatedFrom] = useState(filters.created_at_from ?? '');
-  const [createdTo, setCreatedTo] = useState(filters.created_at_to ?? '');
   const [metFrom, setMetFrom] = useState(filters.met_at_from ?? '');
   const [metTo, setMetTo] = useState(filters.met_at_to ?? '');
 
-  const { data: tagsData } = useTagSuggestions('', 20);
-  const { data: interestsData } = useInterestSuggestions('', 20);
-  const { data: occupationsData } = useOccupationSuggestions('', 20);
+  // Autocomplete queries
+  const [tagQuery, setTagQuery] = useState('');
+  const [interestQuery, setInterestQuery] = useState('');
+  const [occupationQuery, setOccupationQuery] = useState('');
+  const [positionQuery, setPositionQuery] = useState('');
+  const [statusQuery, setStatusQuery] = useState('');
 
-  const tags = tagsData?.data ?? [];
-  const interests = interestsData?.data ?? [];
-  const occupations = occupationsData?.data ?? [];
+  // Fetch suggestions
+  const { data: tagSuggestions, isLoading: loadingTags } = useTagSuggestions(tagQuery || '', 20);
+  const { data: interestSuggestions, isLoading: loadingInterests } = useInterestSuggestions(interestQuery || '', 20);
+  const { data: occupationSuggestions, isLoading: loadingOccupations } = useOccupationSuggestions(occupationQuery || '', 20);
+  const { data: positionSuggestions, isLoading: loadingPositions } = usePositionSuggestions(positionQuery || '', 20);
+  const { data: statusSuggestions, isLoading: loadingStatuses } = useStatusSuggestions(statusQuery || '');
 
-  const selectedTags = useMemo(() => filters.tag_ids ?? [], [filters.tag_ids]);
-  const selectedInterests = useMemo(() => filters.interest_ids ?? [], [filters.interest_ids]);
-  const selectedOccupations = useMemo(() => filters.occupation_ids ?? [], [filters.occupation_ids]);
+  const selectedTags = useMemo(() => {
+    const tagIds = filters.tag_ids ?? [];
+    return (tagSuggestions?.data ?? []).filter((tag) => tagIds.includes(tag.id)) as Tag[];
+  }, [filters.tag_ids, tagSuggestions?.data]);
 
-  const handleToggleTag = useCallback(
-    (tagId: string) => {
-      const newTags = selectedTags.includes(tagId)
-        ? selectedTags.filter((id) => id !== tagId)
-        : [...selectedTags, tagId];
-      onFiltersChange({ ...filters, tag_ids: newTags });
+  const selectedInterests = useMemo(() => {
+    const interestIds = filters.interest_ids ?? [];
+    return (interestSuggestions?.data ?? []).filter((interest) => interestIds.includes(interest.id)) as Interest[];
+  }, [filters.interest_ids, interestSuggestions?.data]);
+
+  const selectedOccupations = useMemo(() => {
+    const occupationIds = filters.occupation_ids ?? [];
+    return (occupationSuggestions?.data ?? []).filter((occupation) => occupationIds.includes(occupation.id)) as Occupation[];
+  }, [filters.occupation_ids, occupationSuggestions?.data]);
+
+  const selectedPositions = useMemo(() => {
+    const positionIds = filters.position_ids ?? [];
+    return (positionSuggestions?.data ?? []).filter((position) => positionIds.includes(position.id)) as Position[];
+  }, [filters.position_ids, positionSuggestions?.data]);
+
+  const selectedStatuses = useMemo(() => {
+    const statusIds = filters.status_ids ?? [];
+    return (statusSuggestions ?? []).filter((status) => statusIds.includes(status.id)) as Status[];
+  }, [filters.status_ids, statusSuggestions]);
+
+  const handleTagSelect = useCallback(
+    (item: Tag) => {
+      const newTagIds = [...(filters.tag_ids ?? []), item.id];
+      onFiltersChange({ ...filters, tag_ids: newTagIds });
     },
-    [selectedTags, filters, onFiltersChange]
+    [filters, onFiltersChange]
   );
 
-  const handleToggleInterest = useCallback(
-    (interestId: string) => {
-      const newInterests = selectedInterests.includes(interestId)
-        ? selectedInterests.filter((id) => id !== interestId)
-        : [...selectedInterests, interestId];
-      onFiltersChange({ ...filters, interest_ids: newInterests });
+  const handleTagRemove = useCallback(
+    (item: Tag) => {
+      const newTagIds = (filters.tag_ids ?? []).filter((id) => id !== item.id);
+      onFiltersChange({ ...filters, tag_ids: newTagIds.length > 0 ? newTagIds : undefined });
     },
-    [selectedInterests, filters, onFiltersChange]
+    [filters, onFiltersChange]
   );
 
-  const handleToggleOccupation = useCallback(
-    (occupationId: string) => {
-      const newOccupations = selectedOccupations.includes(occupationId)
-        ? selectedOccupations.filter((id) => id !== occupationId)
-        : [...selectedOccupations, occupationId];
-      onFiltersChange({ ...filters, occupation_ids: newOccupations });
+  const handleInterestSelect = useCallback(
+    (item: Interest) => {
+      const newInterestIds = [...(filters.interest_ids ?? []), item.id];
+      onFiltersChange({ ...filters, interest_ids: newInterestIds });
     },
-    [selectedOccupations, filters, onFiltersChange]
+    [filters, onFiltersChange]
+  );
+
+  const handleInterestRemove = useCallback(
+    (item: Interest) => {
+      const newInterestIds = (filters.interest_ids ?? []).filter((id) => id !== item.id);
+      onFiltersChange({ ...filters, interest_ids: newInterestIds.length > 0 ? newInterestIds : undefined });
+    },
+    [filters, onFiltersChange]
+  );
+
+  const handleOccupationSelect = useCallback(
+    (item: Occupation) => {
+      const newOccupationIds = [...(filters.occupation_ids ?? []), item.id];
+      onFiltersChange({ ...filters, occupation_ids: newOccupationIds });
+    },
+    [filters, onFiltersChange]
+  );
+
+  const handleOccupationRemove = useCallback(
+    (item: Occupation) => {
+      const newOccupationIds = (filters.occupation_ids ?? []).filter((id) => id !== item.id);
+      onFiltersChange({ ...filters, occupation_ids: newOccupationIds.length > 0 ? newOccupationIds : undefined });
+    },
+    [filters, onFiltersChange]
+  );
+
+  const handlePositionSelect = useCallback(
+    (item: Position) => {
+      const newPositionIds = [...(filters.position_ids ?? []), item.id];
+      onFiltersChange({ ...filters, position_ids: newPositionIds });
+    },
+    [filters, onFiltersChange]
+  );
+
+  const handlePositionRemove = useCallback(
+    (item: Position) => {
+      const newPositionIds = (filters.position_ids ?? []).filter((id) => id !== item.id);
+      onFiltersChange({ ...filters, position_ids: newPositionIds.length > 0 ? newPositionIds : undefined });
+    },
+    [filters, onFiltersChange]
+  );
+
+  const handleStatusSelect = useCallback(
+    (item: Status) => {
+      const newStatusIds = [...(filters.status_ids ?? []), item.id];
+      onFiltersChange({ ...filters, status_ids: newStatusIds });
+    },
+    [filters, onFiltersChange]
+  );
+
+  const handleStatusRemove = useCallback(
+    (item: Status) => {
+      const newStatusIds = (filters.status_ids ?? []).filter((id) => id !== item.id);
+      onFiltersChange({ ...filters, status_ids: newStatusIds.length > 0 ? newStatusIds : undefined });
+    },
+    [filters, onFiltersChange]
   );
 
   const handleApplyFilters = useCallback(() => {
@@ -76,18 +155,17 @@ export function FilterPanel({
       ...filters,
     };
     if (searchTerm) newFilters.search = searchTerm;
-    if (createdFrom) newFilters.created_at_from = createdFrom;
-    if (createdTo) newFilters.created_at_to = createdTo;
+    else delete newFilters.search;
     if (metFrom) newFilters.met_at_from = metFrom;
+    else delete newFilters.met_at_from;
     if (metTo) newFilters.met_at_to = metTo;
+    else delete newFilters.met_at_to;
     
     onFiltersChange(newFilters);
-  }, [filters, searchTerm, createdFrom, createdTo, metFrom, metTo, onFiltersChange]);
+  }, [filters, searchTerm, metFrom, metTo, onFiltersChange]);
 
   const handleClearFilters = useCallback(() => {
     setSearchTerm('');
-    setCreatedFrom('');
-    setCreatedTo('');
     setMetFrom('');
     setMetTo('');
     onFiltersChange({});
@@ -95,13 +173,13 @@ export function FilterPanel({
 
   const hasActiveFilters =
     searchTerm ||
-    createdFrom ||
-    createdTo ||
     metFrom ||
     metTo ||
-    selectedTags.length > 0 ||
-    selectedInterests.length > 0 ||
-    selectedOccupations.length > 0;
+    (filters.tag_ids ?? []).length > 0 ||
+    (filters.interest_ids ?? []).length > 0 ||
+    (filters.occupation_ids ?? []).length > 0 ||
+    (filters.position_ids ?? []).length > 0 ||
+    (filters.status_ids ?? []).length > 0;
 
   return (
     <Card className="w-full animate-slide-down">
@@ -115,38 +193,92 @@ export function FilterPanel({
           )}
         </div>
 
-        {/* Search */}
+        {/* Search - in name, middle name, last name */}
         <div>
           <Input
             label="Search"
             type="text"
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); }}
-            placeholder="Search contacts..."
+            placeholder="Search in name, middle name, last name..."
           />
         </div>
 
-        {/* Date Ranges */}
-        <div className="space-y-4">
-          <h4 className="text-sm font-medium text-gray-700">Date Range</h4>
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Created From"
-              type="date"
-              value={createdFrom}
-              onChange={(e) => { setCreatedFrom(e.target.value); }}
-            />
-            <Input
-              label="Created To"
-              type="date"
-              value={createdTo}
-              onChange={(e) => { setCreatedTo(e.target.value); }}
-            />
-          </div>
-        </div>
+        {/* Status Filter - only for contacts page */}
+        {showStatusFilter && (
+          <Autocomplete
+            label="Status"
+            placeholder="Filter by status..."
+            query={statusQuery}
+            onQueryChange={setStatusQuery}
+            suggestions={statusSuggestions ?? []}
+            selectedItems={selectedStatuses}
+            onSelect={handleStatusSelect}
+            onRemove={handleStatusRemove}
+            allowCreate={false}
+            isLoading={loadingStatuses}
+          />
+        )}
 
+        {/* Tags - autocomplete with no create */}
+        <Autocomplete
+          label="Tags"
+          placeholder="Filter by tags..."
+          query={tagQuery}
+          onQueryChange={setTagQuery}
+          suggestions={tagSuggestions?.data ?? []}
+          selectedItems={selectedTags}
+          onSelect={handleTagSelect}
+          onRemove={handleTagRemove}
+          allowCreate={false}
+          isLoading={loadingTags}
+        />
+
+        {/* Interests */}
+        <Autocomplete
+          label="Interests"
+          placeholder="Filter by interests..."
+          query={interestQuery}
+          onQueryChange={setInterestQuery}
+          suggestions={interestSuggestions?.data ?? []}
+          selectedItems={selectedInterests}
+          onSelect={handleInterestSelect}
+          onRemove={handleInterestRemove}
+          allowCreate={false}
+          isLoading={loadingInterests}
+        />
+
+        {/* Occupations */}
+        <Autocomplete
+          label="Occupations"
+          placeholder="Filter by occupations..."
+          query={occupationQuery}
+          onQueryChange={setOccupationQuery}
+          suggestions={occupationSuggestions?.data ?? []}
+          selectedItems={selectedOccupations}
+          onSelect={handleOccupationSelect}
+          onRemove={handleOccupationRemove}
+          allowCreate={false}
+          isLoading={loadingOccupations}
+        />
+
+        {/* Positions */}
+        <Autocomplete
+          label="Positions"
+          placeholder="Filter by positions..."
+          query={positionQuery}
+          onQueryChange={setPositionQuery}
+          suggestions={positionSuggestions?.data ?? []}
+          selectedItems={selectedPositions}
+          onSelect={handlePositionSelect}
+          onRemove={handlePositionRemove}
+          allowCreate={false}
+          isLoading={loadingPositions}
+        />
+
+        {/* Met Date Range */}
         <div className="space-y-4">
-          <h4 className="text-sm font-medium text-gray-700">Met Date Range</h4>
+          <h4 className="text-sm font-medium text-gray-700">Date Met Range</h4>
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Met From"
@@ -162,75 +294,6 @@ export function FilterPanel({
             />
           </div>
         </div>
-
-        {/* Tags */}
-        {tags.length > 0 && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Tags
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {tags.slice(0, 10).map((tag) => (
-                <Badge
-                  key={tag.id}
-                  variant={selectedTags.includes(tag.id) ? 'primary' : 'default'}
-                  className="cursor-pointer transition-all duration-150"
-                  onClick={() => { handleToggleTag(tag.id); }}
-                >
-                  {tag.name}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Interests */}
-        {interests.length > 0 && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Interests
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {interests.slice(0, 10).map((interest) => (
-                <Badge
-                  key={interest.id}
-                  variant={
-                    selectedInterests.includes(interest.id) ? 'primary' : 'default'
-                  }
-                  className="cursor-pointer transition-all duration-150"
-                  onClick={() => { handleToggleInterest(interest.id); }}
-                >
-                  {interest.name}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Occupations */}
-        {occupations.length > 0 && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Occupations
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {occupations.slice(0, 10).map((occupation) => (
-                <Badge
-                  key={occupation.id}
-                  variant={
-                    selectedOccupations.includes(occupation.id)
-                      ? 'primary'
-                      : 'default'
-                  }
-                  className="cursor-pointer transition-all duration-150"
-                  onClick={() => { handleToggleOccupation(occupation.id); }}
-                >
-                  {occupation.name}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
 
         <Button onClick={handleApplyFilters} className="w-full">
           Apply Filters

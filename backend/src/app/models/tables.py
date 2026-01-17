@@ -38,20 +38,21 @@ contact_interests = Table(
     ),
 )
 
-# Contact to Occupations many-to-many relationship
-contact_occupations = Table(
-    "contact_occupations",
+# ContactOccupation to Positions many-to-many relationship
+# This links positions to specific contact-occupation relationships
+contact_occupation_positions = Table(
+    "contact_occupation_positions",
     Base.metadata,
     Column(
-        "contact_id",
+        "contact_occupation_id",
         UUID(as_uuid=True),
-        ForeignKey("contacts.id", ondelete="CASCADE"),
+        ForeignKey("contact_occupations.id", ondelete="CASCADE"),
         primary_key=True,
     ),
     Column(
-        "occupation_id",
+        "position_id",
         UUID(as_uuid=True),
-        ForeignKey("occupations.id", ondelete="CASCADE"),
+        ForeignKey("positions.id", ondelete="CASCADE"),
         primary_key=True,
     ),
 )

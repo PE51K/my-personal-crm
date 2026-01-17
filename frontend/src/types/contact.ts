@@ -27,6 +27,15 @@ export interface Interest {
 export interface Occupation {
   id: string;
   name: string;
+  positions: Position[];
+}
+
+/**
+ * Base position
+ */
+export interface Position {
+  id: string;
+  name: string;
 }
 
 /**
@@ -74,6 +83,17 @@ export interface OccupationInput {
   name: string;
 }
 
+export interface PositionInput {
+  id: string;
+  name: string;
+}
+
+export interface OccupationWithPositionsInput {
+  id: string;
+  name: string;
+  position_ids: (string | PositionInput)[];
+}
+
 export interface StatusInput {
   id: string;
   name: string;
@@ -94,7 +114,7 @@ export interface ContactCreateRequest {
   notes?: string | null;
   tag_ids?: (string | TagInput)[];
   interest_ids?: (string | InterestInput)[];
-  occupation_ids?: (string | OccupationInput)[];
+  occupations?: OccupationWithPositionsInput[];
   association_contact_ids?: string[];
 }
 
@@ -113,7 +133,7 @@ export interface ContactUpdateRequest {
   notes?: string | null;
   tag_ids?: (string | TagInput)[];
   interest_ids?: (string | InterestInput)[];
-  occupation_ids?: (string | OccupationInput)[];
+  occupations?: OccupationWithPositionsInput[];
   association_contact_ids?: string[];
 }
 
@@ -181,11 +201,11 @@ export interface ContactListParams {
   page?: number;
   page_size?: number;
   status_id?: string;
+  status_ids?: string[];
   tag_ids?: string[];
   interest_ids?: string[];
   occupation_ids?: string[];
-  created_at_from?: string;
-  created_at_to?: string;
+  position_ids?: string[];
   met_at_from?: string;
   met_at_to?: string;
   search?: string;

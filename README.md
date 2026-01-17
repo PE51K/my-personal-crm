@@ -103,7 +103,8 @@ my-personal-crm/
    # Install dependencies with uv
    uv sync
 
-   # Run migrations
+   # Install migration dependencies and run migrations
+   uv sync --extra migrations
    uv run alembic upgrade head
 
    # Start the API (watches only src directory to avoid permission issues with volumes)
@@ -219,8 +220,8 @@ docker compose down                  # Stop all services
 
 # Database management
 docker compose exec db psql -U crm_user -d personal_crm
-cd backend && uv run alembic upgrade head
-cd backend && uv run alembic revision --autogenerate -m "description"
+cd backend && uv sync --extra migrations && uv run alembic upgrade head
+cd backend && uv sync --extra migrations && uv run alembic revision --autogenerate -m "description"
 
 # View logs
 docker compose logs -f api           # Backend logs

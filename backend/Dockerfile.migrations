@@ -1,0 +1,61 @@
+# =============================================================================
+# Migrations Dockerfile - Minimal dependencies for running Alembic migrations
+# =============================================================================
+# This Dockerfile creates a lightweight image that only includes the
+# dependencies needed to run database migrations, reducing image size
+# and build time for the migrations container.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Builder - Install migration dependencies
+# -----------------------------------------------------------------------------
+FROM python:3.12-slim AS builder
+
+# Install uv for dependency management
+# https://docs.astral.sh/uv/guides/integration/docker/
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Set working directory
+WORKDIR /app
+
+# Enable bytecode compilation for faster startup
+ENV UV_COMPILE_BYTECODE=1
+
+# Disable uv cache to reduce image size (we use cache mount instead)
+ENV UV_NO_CACHE=1
+
+# Copy dependency files first for better layer caching
+COPY pyproject.toml uv.lock ./
+
+# Install only migration dependencies using uv sync
+RUN uv sync --frozen --no-install-project --no-dev --extra migrations
+
+# Copy the rest of the application (needed for models and settings)
+COPY . .
+
+# Install the project itself with migration dependencies
+RUN uv sync --frozen --no-dev --extra migrations
+
+# -----------------------------------------------------------------------------
+# Stage 2: Runtime - Final migrations image
+# -----------------------------------------------------------------------------
+FROM python:3.12-slim AS runtime
+
+# Set working directory
+WORKDIR /app
+
+# Copy the virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
+
+# Copy application source code and alembic migrations
+COPY --from=builder /app/src /app/src
+COPY --from=builder /app/alembic /app/alembic
+COPY --from=builder /app/alembic.ini /app/alembic.ini
+
+# Set environment variables
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Default command runs migrations
+CMD ["alembic", "upgrade", "head"]

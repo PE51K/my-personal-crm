@@ -13,8 +13,10 @@ from sqlalchemy.orm import selectinload
 from app.models import (
     Contact,
     ContactAssociation,
+    ContactOccupation,
     Interest,
     Occupation,
+    Position,
     Status,
     Tag,
 )
@@ -27,7 +29,10 @@ from app.schemas.contact import (
     InterestInput,
     OccupationBase,
     OccupationInput,
+    OccupationWithPositionsInput,
     PaginationMeta,
+    PositionBase,
+    PositionInput,
     StatusBase,
     StatusInput,
     TagBase,
@@ -127,22 +132,25 @@ async def _process_interests(
 async def _process_occupations(
     db: AsyncSession,
     occupation_inputs: list[str | OccupationInput] | None,
-) -> list[UUID]:
-    """Process occupation inputs and return list of valid occupation UUIDs.
+) -> tuple[list[UUID], dict[str, UUID]]:
+    """Process occupation inputs and return list of valid occupation UUIDs and temp ID mapping.
 
     Creates new occupations for temp IDs and returns real UUIDs.
+    Also returns a mapping of temp_id -> real_id for positions to reference.
 
     Args:
         db: Database session instance.
         occupation_inputs: List of occupation IDs or occupation input objects.
 
     Returns:
-        List of valid occupation UUIDs.
+        Tuple of (list of valid occupation UUIDs, mapping of temp_id -> real_id).
     """
     if not occupation_inputs:
-        return []
+        return [], {}
 
     occupation_ids = []
+    temp_id_mapping: dict[str, UUID] = {}
+    
     for occupation_input in occupation_inputs:
         if isinstance(occupation_input, str):
             # String ID - check if temp or real
@@ -157,11 +165,119 @@ async def _process_occupations(
             db.add(new_occupation)
             await db.flush()
             occupation_ids.append(new_occupation.id)
+            # Map temp ID to real ID
+            temp_id_mapping[occupation_input.id] = new_occupation.id
         else:
             # Use existing occupation ID
             occupation_ids.append(UUID(occupation_input.id))
 
-    return occupation_ids
+    return occupation_ids, temp_id_mapping
+
+
+async def _process_occupations_with_positions(
+    db: AsyncSession,
+    occupations_input: list[OccupationWithPositionsInput] | None,
+) -> list[tuple[UUID, list[UUID]]]:
+    """Process occupations with their positions and return list of (occupation_id, position_ids) tuples.
+
+    Creates new occupations and positions for temp IDs and returns real UUIDs.
+
+    Args:
+        db: Database session instance.
+        occupations_input: List of occupations with their associated positions.
+
+    Returns:
+        List of tuples (occupation_id, list of position_ids).
+    """
+    if not occupations_input:
+        return []
+
+    result = []
+    
+    for occ_input in occupations_input:
+        # Process occupation
+        occupation_id: UUID
+        if _is_temp_id(occ_input.id):
+            # Create new occupation
+            new_occupation = Occupation(name=occ_input.name)
+            db.add(new_occupation)
+            await db.flush()
+            occupation_id = new_occupation.id
+        else:
+            occupation_id = UUID(occ_input.id)
+        
+        # Process positions for this occupation
+        position_ids = await _process_positions(db, occ_input.position_ids, None)
+        
+        result.append((occupation_id, position_ids))
+    
+    return result
+
+
+async def _process_positions(
+    db: AsyncSession,
+    position_inputs: list[str | PositionInput] | None,
+    occupation_temp_id_mapping: dict[str, UUID] | None = None,
+) -> list[UUID]:
+    """Process position inputs and return list of valid position UUIDs.
+
+    Creates new positions for temp IDs and returns real UUIDs.
+    Positions are now independent (no occupation_id).
+
+    Args:
+        db: Database session instance.
+        position_inputs: List of position IDs or position input objects.
+        occupation_temp_id_mapping: Unused (kept for backward compatibility).
+
+    Returns:
+        List of valid position UUIDs.
+    """
+    if not position_inputs:
+        return []
+
+    position_ids = []
+    # Track positions we've already processed in this batch to avoid duplicates
+    processed_positions_cache: dict[str, UUID] = {}
+    
+    for position_input in position_inputs:
+        if isinstance(position_input, str):
+            # String ID - check if temp or real
+            if _is_temp_id(position_input):
+                logger.warning("Received temp position ID without name: %s", position_input)
+                continue
+            position_ids.append(UUID(position_input))
+        # PositionInput object
+        elif _is_temp_id(position_input.id):
+            # Check cache first (for positions created in this batch)
+            if position_input.name in processed_positions_cache:
+                # Use position we already processed in this batch
+                position_ids.append(processed_positions_cache[position_input.name])
+                continue
+            
+            # Check if position with same name already exists in DB
+            existing_position_result = await db.execute(
+                select(Position).where(Position.name == position_input.name)
+            )
+            existing_position = existing_position_result.scalar_one_or_none()
+            
+            if existing_position:
+                # Use existing position from DB
+                position_ids.append(existing_position.id)
+                # Cache it for future duplicates in this batch
+                processed_positions_cache[position_input.name] = existing_position.id
+            else:
+                # Create new position
+                new_position = Position(name=position_input.name)
+                db.add(new_position)
+                await db.flush()
+                position_ids.append(new_position.id)
+                # Cache it for future duplicates in this batch
+                processed_positions_cache[position_input.name] = new_position.id
+        else:
+            # Use existing position ID
+            position_ids.append(UUID(position_input.id))
+
+    return position_ids
 
 
 async def _process_status(
@@ -243,8 +359,21 @@ async def _build_contact_response(
         InterestBase(id=str(interest.id), name=interest.name) for interest in contact.interests
     ]
 
-    # Build occupations
-    occupations = [OccupationBase(id=str(occ.id), name=occ.name) for occ in contact.occupations]
+    # Build occupations with their positions from contact_occupations
+    occupations = []
+    for contact_occ in contact.contact_occupations:
+        # Get all positions for this contact-occupation relationship
+        occ_positions = [
+            PositionBase(id=str(pos.id), name=pos.name)
+            for pos in contact_occ.positions
+        ]
+        occupations.append(
+            OccupationBase(
+                id=str(contact_occ.occupation.id),
+                name=contact_occ.occupation.name,
+                positions=occ_positions
+            )
+        )
 
     # Build associations (relationships already eagerly loaded via selectinload)
     associations = []
@@ -321,7 +450,7 @@ async def create_contact(
     notes: str | None = None,
     tag_ids: list[str | TagInput] | None = None,
     interest_ids: list[str | InterestInput] | None = None,
-    occupation_ids: list[str | OccupationInput] | None = None,
+    occupations: list[OccupationWithPositionsInput] | None = None,
     association_contact_ids: list[str] | None = None,
 ) -> ContactResponse:
     """Create a new contact.
@@ -339,7 +468,7 @@ async def create_contact(
         notes: Additional notes.
         tag_ids: List of tag IDs or objects to associate (supports temp IDs).
         interest_ids: List of interest IDs or objects to associate (supports temp IDs).
-        occupation_ids: List of occupation IDs or objects to associate (supports temp IDs).
+        occupations: List of occupations with their positions (supports temp IDs).
         association_contact_ids: List of contact IDs to associate.
 
     Returns:
@@ -351,10 +480,9 @@ async def create_contact(
     # Process status input (create new status if needed)
     processed_status_id = await _process_status(db, status_id)
 
-    # Process tag/interest/occupation inputs (create new ones if needed)
+    # Process tag/interest inputs (create new ones if needed)
     processed_tag_ids = await _process_tags(db, tag_ids)
     processed_interest_ids = await _process_interests(db, interest_ids)
-    processed_occupation_ids = await _process_occupations(db, occupation_ids)
 
     # Create contact
     contact = Contact(
@@ -370,29 +498,52 @@ async def create_contact(
     )
     db.add(contact)
     await db.flush()
-
-    # Refresh contact to load lazy-loaded collections for async context
-    await db.refresh(contact, attribute_names=["tags", "interests", "occupations"])
+    
+    # Re-query contact with all relationships loaded to avoid lazy loading issues
+    contact_stmt = select(Contact).where(Contact.id == contact.id).options(
+        selectinload(Contact.tags),
+        selectinload(Contact.interests)
+    )
+    contact_result = await db.execute(contact_stmt)
+    contact = contact_result.scalar_one()
 
     # Load and associate tags
     if processed_tag_ids:
         result = await db.execute(select(Tag).where(Tag.id.in_(processed_tag_ids)))
         tags = result.scalars().all()
-        contact.tags.extend(tags)
+        contact.tags = tags
 
     # Load and associate interests
     if processed_interest_ids:
         result = await db.execute(select(Interest).where(Interest.id.in_(processed_interest_ids)))
         interests = result.scalars().all()
-        contact.interests.extend(interests)
+        contact.interests = interests
 
-    # Load and associate occupations
-    if processed_occupation_ids:
-        result = await db.execute(
-            select(Occupation).where(Occupation.id.in_(processed_occupation_ids))
-        )
-        occupations = result.scalars().all()
-        contact.occupations.extend(occupations)
+    # Process and create contact-occupation relationships with positions
+    if occupations:
+        occupations_data = await _process_occupations_with_positions(db, occupations)
+        for occupation_id, position_ids in occupations_data:
+            # Create ContactOccupation
+            contact_occ = ContactOccupation(
+                contact_id=contact.id,
+                occupation_id=occupation_id
+            )
+            db.add(contact_occ)
+            await db.flush()
+            
+            # Link positions to this ContactOccupation
+            if position_ids:
+                result = await db.execute(
+                    select(Position).where(Position.id.in_(position_ids))
+                )
+                positions = result.scalars().all()
+                # Re-query with relationships loaded to avoid lazy loading
+                co_stmt = select(ContactOccupation).where(
+                    ContactOccupation.id == contact_occ.id
+                ).options(selectinload(ContactOccupation.positions))
+                co_result = await db.execute(co_stmt)
+                contact_occ_loaded = co_result.scalar_one()
+                contact_occ_loaded.positions = positions
 
     # Create associations
     if association_contact_ids:
@@ -431,7 +582,8 @@ async def get_contact(
             selectinload(Contact.status),
             selectinload(Contact.tags),
             selectinload(Contact.interests),
-            selectinload(Contact.occupations),
+            selectinload(Contact.contact_occupations).selectinload(ContactOccupation.occupation),
+            selectinload(Contact.contact_occupations).selectinload(ContactOccupation.positions),
             selectinload(Contact.source_associations).selectinload(
                 ContactAssociation.target_contact
             ),
@@ -453,11 +605,11 @@ async def list_contacts(
     page: int = 1,
     page_size: int = 20,
     status_id: str | None = None,
+    status_ids: list[str] | None = None,
     tag_ids: list[str] | None = None,
     interest_ids: list[str] | None = None,
     occupation_ids: list[str] | None = None,
-    created_at_from: date | None = None,
-    created_at_to: date | None = None,
+    position_ids: list[str] | None = None,
     met_at_from: date | None = None,
     met_at_to: date | None = None,
     search: str | None = None,
@@ -470,15 +622,15 @@ async def list_contacts(
         db: Database session instance.
         page: Page number (1-indexed).
         page_size: Number of items per page.
-        status_id: Filter by status ID.
-        tag_ids: Filter by tag IDs.
-        interest_ids: Filter by interest IDs.
-        occupation_ids: Filter by occupation IDs.
-        created_at_from: Filter by creation date (from).
-        created_at_to: Filter by creation date (to).
+        status_id: Filter by status ID (single).
+        status_ids: Filter by status IDs (multiple, any match).
+        tag_ids: Filter by tag IDs (any match).
+        interest_ids: Filter by interest IDs (any match).
+        occupation_ids: Filter by occupation IDs (any match).
+        position_ids: Filter by position IDs (any match).
         met_at_from: Filter by met date (from).
         met_at_to: Filter by met date (to).
-        search: Search in names.
+        search: Search in names (first, middle, last).
         sort_by: Field to sort by.
         sort_order: Sort order (asc/desc).
 
@@ -491,12 +643,10 @@ async def list_contacts(
     # Apply filters
     if status_id:
         query = query.where(Contact.status_id == UUID(status_id))
-
-    if created_at_from:
-        query = query.where(Contact.created_at >= created_at_from)
-
-    if created_at_to:
-        query = query.where(Contact.created_at <= created_at_to)
+    elif status_ids:
+        # Filter by multiple status IDs (any match)
+        status_uuid_ids = [UUID(sid) for sid in status_ids]
+        query = query.where(Contact.status_id.in_(status_uuid_ids))
 
     if met_at_from:
         query = query.where(Contact.met_at >= met_at_from)
@@ -509,15 +659,15 @@ async def list_contacts(
     if search:
         # Split search into words to support full name search like "John Smith"
         search_words = search.strip().lower().split()
-        # Build OR conditions for all words
+        # Build OR conditions for all words - search in first_name, middle_name, last_name
         or_conditions = []
         for word in search_words:
             pattern = f"%{word}%"
             or_conditions.extend(
                 [
                     Contact.first_name.ilike(pattern),
-                    Contact.last_name.ilike(pattern),
                     Contact.middle_name.ilike(pattern),
+                    Contact.last_name.ilike(pattern),
                 ]
             )
         query = query.where(or_(*or_conditions))
@@ -559,8 +709,8 @@ async def list_contacts(
         occupation_uuid_ids = [UUID(oid) for oid in occupation_ids]
         occupation_result = await db.execute(
             select(Contact.id)
-            .join(Contact.occupations)
-            .where(Occupation.id.in_(occupation_uuid_ids))
+            .join(Contact.contact_occupations)
+            .where(ContactOccupation.occupation_id.in_(occupation_uuid_ids))
             .group_by(Contact.id)
         )
         occupation_contact_ids = {row[0] for row in occupation_result}
@@ -568,6 +718,22 @@ async def list_contacts(
             occupation_contact_ids
             if contact_ids_to_filter is None
             else contact_ids_to_filter & occupation_contact_ids
+        )
+
+    if position_ids:
+        position_uuid_ids = [UUID(pid) for pid in position_ids]
+        position_result = await db.execute(
+            select(Contact.id)
+            .join(Contact.contact_occupations)
+            .join(ContactOccupation.positions)
+            .where(Position.id.in_(position_uuid_ids))
+            .group_by(Contact.id)
+        )
+        position_contact_ids = {row[0] for row in position_result}
+        contact_ids_to_filter = (
+            position_contact_ids
+            if contact_ids_to_filter is None
+            else contact_ids_to_filter & position_contact_ids
         )
 
     if contact_ids_to_filter is not None:
@@ -681,7 +847,7 @@ async def update_contact(
     photo_path: str | None = None,
     tag_ids: list[str | TagInput] | None = None,
     interest_ids: list[str | InterestInput] | None = None,
-    occupation_ids: list[str | OccupationInput] | None = None,
+    occupations: list[OccupationWithPositionsInput] | None = None,
     association_contact_ids: list[str] | None = None,
 ) -> ContactResponse:
     """Update a contact.
@@ -701,7 +867,7 @@ async def update_contact(
         photo_path: Photo storage path.
         tag_ids: List of tag IDs or objects to associate (supports temp IDs).
         interest_ids: List of interest IDs or objects to associate (supports temp IDs).
-        occupation_ids: List of occupation IDs or objects to associate (supports temp IDs).
+        occupations: List of occupations with their positions (supports temp IDs).
         association_contact_ids: List of contact IDs to associate.
 
     Returns:
@@ -718,7 +884,8 @@ async def update_contact(
         .options(
             selectinload(Contact.tags),
             selectinload(Contact.interests),
-            selectinload(Contact.occupations),
+            selectinload(Contact.contact_occupations).selectinload(ContactOccupation.occupation),
+            selectinload(Contact.contact_occupations).selectinload(ContactOccupation.positions),
         )
     )
     contact = result.scalar_one_or_none()
@@ -756,41 +923,58 @@ async def update_contact(
     if tag_ids is not None:
         # Process tag inputs (create new ones if needed)
         processed_tag_ids = await _process_tags(db, tag_ids)
-        # Clear existing tags
-        contact.tags.clear()
-        # Load and add new tags
+        # Load and assign tags directly (avoids lazy loading issues)
         if processed_tag_ids:
             tag_result = await db.execute(select(Tag).where(Tag.id.in_(processed_tag_ids)))
             tags = tag_result.scalars().all()
-            contact.tags.extend(tags)
+            contact.tags = tags
+        else:
+            contact.tags = []
 
     # Update interests if provided
     if interest_ids is not None:
         # Process interest inputs (create new ones if needed)
         processed_interest_ids = await _process_interests(db, interest_ids)
-        # Clear existing interests
-        contact.interests.clear()
-        # Load and add new interests
+        # Load and assign interests directly (avoids lazy loading issues)
         if processed_interest_ids:
             interest_result = await db.execute(
                 select(Interest).where(Interest.id.in_(processed_interest_ids))
             )
             interests = interest_result.scalars().all()
-            contact.interests.extend(interests)
+            contact.interests = interests
+        else:
+            contact.interests = []
 
-    # Update occupations if provided
-    if occupation_ids is not None:
-        # Process occupation inputs (create new ones if needed)
-        processed_occupation_ids = await _process_occupations(db, occupation_ids)
-        # Clear existing occupations
-        contact.occupations.clear()
-        # Load and add new occupations
-        if processed_occupation_ids:
-            occupation_result = await db.execute(
-                select(Occupation).where(Occupation.id.in_(processed_occupation_ids))
+    # Update occupations with positions if provided
+    if occupations is not None:
+        # Delete existing contact-occupation relationships
+        await db.execute(
+            sql_delete(ContactOccupation).where(ContactOccupation.contact_id == contact.id)
+        )
+        # Process and create new contact-occupation relationships with positions
+        occupations_data = await _process_occupations_with_positions(db, occupations)
+        for occupation_id, position_ids in occupations_data:
+            # Create ContactOccupation
+            contact_occ = ContactOccupation(
+                contact_id=contact.id,
+                occupation_id=occupation_id
             )
-            occupations = occupation_result.scalars().all()
-            contact.occupations.extend(occupations)
+            db.add(contact_occ)
+            await db.flush()
+            
+            # Link positions to this ContactOccupation
+            if position_ids:
+                result = await db.execute(
+                    select(Position).where(Position.id.in_(position_ids))
+                )
+                positions = result.scalars().all()
+                # Re-query with relationships loaded to avoid lazy loading
+                co_stmt = select(ContactOccupation).where(
+                    ContactOccupation.id == contact_occ.id
+                ).options(selectinload(ContactOccupation.positions))
+                co_result = await db.execute(co_stmt)
+                contact_occ_loaded = co_result.scalar_one()
+                contact_occ_loaded.positions = positions
 
     # Update associations if provided
     if association_contact_ids is not None:

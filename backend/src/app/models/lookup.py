@@ -4,14 +4,15 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Text, func
+from sqlalchemy import ForeignKey, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
-from app.models.tables import contact_interests, contact_occupations, contact_tags
+from app.models.tables import contact_interests, contact_tags
 
 if TYPE_CHECKING:
+    from app.models.association import ContactOccupation
     from app.models.contact import Contact
 
 
@@ -65,6 +66,26 @@ class Occupation(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
     # Relationships
-    contacts: Mapped[list["Contact"]] = relationship(
-        secondary=contact_occupations, back_populates="occupations"
+    contact_occupations: Mapped[list["ContactOccupation"]] = relationship(
+        back_populates="occupation", cascade="all, delete-orphan"
+    )
+
+
+class Position(Base):
+    """Position model for contact job positions.
+
+    Tracks what positions contacts hold (e.g., "CEO", "CTO", "Senior Developer").
+    Positions are linked to contacts through contact-occupation relationships.
+    """
+
+    __tablename__ = "positions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+
+    # Relationships
+    contact_occupations: Mapped[list["ContactOccupation"]] = relationship(
+        secondary="contact_occupation_positions",
+        back_populates="positions"
     )

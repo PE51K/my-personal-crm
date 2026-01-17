@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   getInterestSuggestions,
   getOccupationSuggestions,
+  getPositionSuggestions,
   getTagSuggestions,
 } from '@/services/suggestions';
 import { getContacts } from '@/services/contacts';
@@ -21,6 +22,7 @@ export const suggestionKeys = {
   tags: (query: string) => [...suggestionKeys.all, 'tags', query] as const,
   interests: (query: string) => [...suggestionKeys.all, 'interests', query] as const,
   occupations: (query: string) => [...suggestionKeys.all, 'occupations', query] as const,
+  positions: (query: string) => [...suggestionKeys.all, 'positions', query] as const,
 };
 
 /**
@@ -54,6 +56,18 @@ export function useOccupationSuggestions(query: string, limit = 10) {
   return useQuery({
     queryKey: suggestionKeys.occupations(query),
     queryFn: () => getOccupationSuggestions({ q: query, limit }),
+    enabled: query.length >= 1,
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Hook to fetch position suggestions
+ */
+export function usePositionSuggestions(query: string, limit = 10) {
+  return useQuery({
+    queryKey: suggestionKeys.positions(query),
+    queryFn: () => getPositionSuggestions({ q: query, limit }),
     enabled: query.length >= 1,
     staleTime: 30 * 1000,
   });

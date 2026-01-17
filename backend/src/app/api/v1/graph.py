@@ -1,6 +1,8 @@
 """Graph API endpoints."""
 
-from fastapi import APIRouter, status
+from datetime import date
+
+from fastapi import APIRouter, Query, status
 
 from app.api.dependencies import CurrentOwner, DBSession
 from app.schemas.graph import (
@@ -21,24 +23,66 @@ router = APIRouter(prefix="/graph", tags=["Graph"])
     "",
     response_model=GraphResponse,
     summary="Get graph",
-    description="Get all contacts and associations for graph visualization.",
+    description="Get contacts and associations for graph visualization with optional filtering.",
 )
 async def get_graph_endpoint(
     current_user: CurrentOwner,
     db: DBSession,
+    status_id: str | None = Query(default=None, description="Filter by status ID (single)"),
+    status_ids: str | None = Query(default=None, description="Filter by status IDs (comma-separated, any match)"),
+    tag_ids: str | None = Query(default=None, description="Filter by tag IDs (comma-separated, any match)"),
+    interest_ids: str | None = Query(
+        default=None, description="Filter by interest IDs (comma-separated, any match)"
+    ),
+    occupation_ids: str | None = Query(
+        default=None, description="Filter by occupation IDs (comma-separated, any match)"
+    ),
+    position_ids: str | None = Query(
+        default=None, description="Filter by position IDs (comma-separated, any match)"
+    ),
+    met_at_from: date | None = Query(default=None, description="Filter by met date (from)"),
+    met_at_to: date | None = Query(default=None, description="Filter by met date (to)"),
+    search: str | None = Query(default=None, description="Search in first, middle, last name"),
 ) -> GraphResponse:
-    """Get all contacts and associations for graph visualization.
+    """Get contacts and associations for graph visualization with optional filtering.
 
-    Returns all contacts as nodes and associations as edges.
+    Returns filtered contacts as nodes and associations as edges.
 
     Args:
         current_user: Current authenticated owner.
         db: Database session.
+        status_id: Filter by status ID (single).
+        status_ids: Filter by status IDs (comma-separated, any match).
+        tag_ids: Filter by tag IDs (comma-separated, any match).
+        interest_ids: Filter by interest IDs (comma-separated, any match).
+        occupation_ids: Filter by occupation IDs (comma-separated, any match).
+        position_ids: Filter by position IDs (comma-separated, any match).
+        met_at_from: Filter by met date (from).
+        met_at_to: Filter by met date (to).
+        search: Search in first, middle, last name.
 
     Returns:
         Graph with nodes and edges.
     """
-    return await get_graph(db)
+    # Parse comma-separated IDs
+    parsed_tag_ids = tag_ids.split(",") if tag_ids else None
+    parsed_interest_ids = interest_ids.split(",") if interest_ids else None
+    parsed_occupation_ids = occupation_ids.split(",") if occupation_ids else None
+    parsed_position_ids = position_ids.split(",") if position_ids else None
+    parsed_status_ids = status_ids.split(",") if status_ids else None
+
+    return await get_graph(
+        db=db,
+        status_id=status_id,
+        status_ids=parsed_status_ids,
+        tag_ids=parsed_tag_ids,
+        interest_ids=parsed_interest_ids,
+        occupation_ids=parsed_occupation_ids,
+        position_ids=parsed_position_ids,
+        met_at_from=met_at_from,
+        met_at_to=met_at_to,
+        search=search,
+    )
 
 
 @router.post(

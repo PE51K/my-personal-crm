@@ -6,16 +6,20 @@ import { type ReactNode, useCallback, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { GraphView } from '@/components/graph/GraphView';
 import { PersonCard } from '@/components/contacts/PersonCard';
+import { FilterPanel } from '@/components/kanban/FilterPanel';
+import { Button } from '@/components/ui/Button';
 import {
   useGraph,
   useCreateEdge,
   useDeleteEdge,
 } from '@/hooks/useGraph';
-import type { GraphNode } from '@/types';
+import type { GraphNode, ContactListParams } from '@/types';
 
 export function GraphPage(): ReactNode {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const { data, isLoading } = useGraph();
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<ContactListParams>({});
+  const { data, isLoading } = useGraph(filters);
   const createEdge = useCreateEdge();
   const deleteEdge = useDeleteEdge();
 
@@ -40,6 +44,10 @@ export function GraphPage(): ReactNode {
     [deleteEdge]
   );
 
+  const handleFiltersChange = useCallback((newFilters: ContactListParams) => {
+    setFilters(newFilters);
+  }, []);
+
   return (
     <Layout>
       <div className="flex flex-col h-[calc(100vh-4rem)]">
@@ -50,7 +58,20 @@ export function GraphPage(): ReactNode {
               Visualize relationships between contacts
             </p>
           </div>
+          <Button
+            variant="secondary"
+            onClick={() => { setShowFilters(!showFilters); }}
+          >
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+          </Button>
         </div>
+
+        {/* Filters */}
+        {showFilters && (
+          <div className="mb-6 max-w-md">
+            <FilterPanel filters={filters} onFiltersChange={handleFiltersChange} showStatusFilter={false} />
+          </div>
+        )}
 
         <div className="flex-1 bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg border-2 border-gray-700 overflow-hidden shadow-lg">
           <GraphView

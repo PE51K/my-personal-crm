@@ -1,9 +1,10 @@
-"""Initial database schema.
+"""Initial database schema - refactored.
 
 Revision ID: 001
 Revises:
 Create Date: 2026-01-17
 
+This migration consolidates all previous migrations into a single clean initial schema.
 """
 
 from collections.abc import Sequence
@@ -59,6 +60,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("name", name="uq_status_name"),
     )
     op.create_index("idx_statuses_is_active", "statuses", ["is_active"])
 
@@ -161,7 +163,26 @@ def upgrade() -> None:
         sa.UniqueConstraint("name"),
     )
 
-    # Create join tables
+    op.create_table(
+        "positions",
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            nullable=False,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("name"),
+    )
+
+    # Create join tables for many-to-many relationships
     op.create_table(
         "contact_tags",
         sa.Column("contact_id", postgresql.UUID(as_uuid=True), nullable=False),
@@ -180,13 +201,41 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("contact_id", "interest_id"),
     )
 
+    # Create contact_occupations table (now a model with id)
     op.create_table(
         "contact_occupations",
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            nullable=False,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("contact_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("occupation_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["contact_id"], ["contacts.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["occupation_id"], ["occupations.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("contact_id", "occupation_id"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("contact_id", "occupation_id", name="uq_contact_occupation"),
+    )
+    op.create_index("idx_contact_occupations_contact", "contact_occupations", ["contact_id"])
+    op.create_index("idx_contact_occupations_occupation", "contact_occupations", ["occupation_id"])
+
+    # Create contact_occupation_positions table (links positions to contact-occupation relationships)
+    op.create_table(
+        "contact_occupation_positions",
+        sa.Column("contact_occupation_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("position_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["contact_occupation_id"], ["contact_occupations.id"], ondelete="CASCADE"
+        ),
+        sa.ForeignKeyConstraint(["position_id"], ["positions.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("contact_occupation_id", "position_id"),
     )
 
     # Create contact_associations table
@@ -257,10 +306,12 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade database schema."""
     # Drop all tables in reverse order
-    op.drop_table("contact_associations")
+    op.drop_table("contact_occupation_positions")
     op.drop_table("contact_occupations")
+    op.drop_table("contact_associations")
     op.drop_table("contact_interests")
     op.drop_table("contact_tags")
+    op.drop_table("positions")
     op.drop_table("occupations")
     op.drop_table("interests")
     op.drop_table("tags")

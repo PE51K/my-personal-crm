@@ -27,7 +27,7 @@ export async function createContact(data: ContactCreateRequest): Promise<Contact
 export async function getContacts(
   params?: ContactListParams
 ): Promise<PaginatedResponse<ContactListItem>> {
-  const queryString = params
+      const queryString = params
     ? buildQueryString({
         page: params.page,
         page_size: params.page_size,
@@ -35,8 +35,7 @@ export async function getContacts(
         tag_ids: params.tag_ids,
         interest_ids: params.interest_ids,
         occupation_ids: params.occupation_ids,
-        created_at_from: params.created_at_from,
-        created_at_to: params.created_at_to,
+        position_ids: params.position_ids,
         met_at_from: params.met_at_from,
         met_at_to: params.met_at_to,
         search: params.search,

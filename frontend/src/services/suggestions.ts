@@ -32,3 +32,13 @@ export async function getOccupationSuggestions(
   const queryString = buildQueryString({ q: params.q, limit: params.limit });
   return api.get<SuggestionListResponse>(`/suggestions/occupations${queryString}`);
 }
+
+/**
+ * Get position suggestions
+ */
+export async function getPositionSuggestions(
+  params: SuggestionParams
+): Promise<SuggestionListResponse> {
+  const queryString = buildQueryString({ q: params.q, limit: params.limit });
+  return api.get<SuggestionListResponse>(`/suggestions/positions${queryString}`);
+}

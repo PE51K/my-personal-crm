@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, Integer, String, Text, func
+from sqlalchemy import CheckConstraint, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,7 +18,10 @@ class AppOwner(Base):
     """
 
     __tablename__ = "app_owner"
-    __table_args__ = (CheckConstraint("id = 1", name="app_owner_single_row"),)
+    __table_args__ = (
+        CheckConstraint("id = 1", name="app_owner_single_row"),
+        Index("idx_app_owner_supabase_user_id", "supabase_user_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     user_id: Mapped[uuid.UUID] = mapped_column(

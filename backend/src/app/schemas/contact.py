@@ -46,6 +46,20 @@ class OccupationBase(BaseModel):
     Attributes:
         id: Occupation unique identifier.
         name: Occupation name.
+        positions: List of positions for this contact-occupation relationship.
+    """
+
+    id: str
+    name: str
+    positions: list["PositionBase"] = Field(default_factory=list)
+
+
+class PositionBase(BaseModel):
+    """Base position schema.
+
+    Attributes:
+        id: Position unique identifier.
+        name: Position name.
     """
 
     id: str
@@ -104,6 +118,18 @@ class InterestInput(BaseModel):
     name: str
 
 
+class PositionInput(BaseModel):
+    """Position input for creating/linking positions.
+
+    Attributes:
+        id: Position ID (can be temp ID like 'temp-123' or real UUID).
+        name: Position name (required for temp IDs).
+    """
+
+    id: str
+    name: str
+
+
 class OccupationInput(BaseModel):
     """Occupation input for creating/linking occupations.
 
@@ -114,6 +140,20 @@ class OccupationInput(BaseModel):
 
     id: str
     name: str
+
+
+class OccupationWithPositionsInput(BaseModel):
+    """Occupation input with associated positions.
+
+    Attributes:
+        id: Occupation ID (can be temp ID like 'temp-123' or real UUID).
+        name: Occupation name (required for temp IDs).
+        position_ids: List of position IDs or objects to associate with this occupation.
+    """
+
+    id: str
+    name: str
+    position_ids: list[str | PositionInput] = Field(default_factory=list)
 
 
 class StatusInput(BaseModel):
@@ -143,7 +183,8 @@ class ContactCreateRequest(BaseModel):
         notes: Additional notes.
         tag_ids: List of tag IDs or objects to associate (supports temp IDs).
         interest_ids: List of interest IDs or objects to associate (supports temp IDs).
-        occupation_ids: List of occupation IDs or objects to associate (supports temp IDs).
+        occupations: List of occupations with their positions (supports temp IDs).
+            Each occupation can have multiple positions associated with it.
         association_contact_ids: List of contact IDs to associate.
     """
 
@@ -175,7 +216,7 @@ class ContactCreateRequest(BaseModel):
 
     tag_ids: list[str | TagInput] = Field(default_factory=list)
     interest_ids: list[str | InterestInput] = Field(default_factory=list)
-    occupation_ids: list[str | OccupationInput] = Field(default_factory=list)
+    occupations: list[OccupationWithPositionsInput] = Field(default_factory=list)
     association_contact_ids: list[str] = Field(default_factory=list)
 
 
@@ -194,7 +235,8 @@ class ContactUpdateRequest(BaseModel):
         notes: Additional notes.
         tag_ids: List of tag IDs or objects to associate (supports temp IDs).
         interest_ids: List of interest IDs or objects to associate (supports temp IDs).
-        occupation_ids: List of occupation IDs or objects to associate (supports temp IDs).
+        occupations: List of occupations with their positions (supports temp IDs).
+            Each occupation can have multiple positions associated with it.
         association_contact_ids: List of contact IDs to associate.
     """
 
@@ -226,7 +268,7 @@ class ContactUpdateRequest(BaseModel):
         return v
 
     interest_ids: list[str | InterestInput] | None = None
-    occupation_ids: list[str | OccupationInput] | None = None
+    occupations: list[OccupationWithPositionsInput] | None = None
     association_contact_ids: list[str] | None = None
 
 
@@ -249,7 +291,7 @@ class ContactResponse(BaseModel):
         photo_url: Signed URL for photo.
         tags: Associated tags.
         interests: Associated interests.
-        occupations: Associated occupations.
+        occupations: Associated occupations with their positions.
         associations: Associated contacts.
         sort_order_in_status: Sort order within status column.
         created_at: When the contact was created.

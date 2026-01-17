@@ -41,6 +41,10 @@ FastAPI backend for the Personal CRM application.
 
 4. **Run database migrations**
    ```bash
+   # Install migration dependencies
+   uv sync --extra migrations
+   
+   # Run migrations
    uv run alembic upgrade head
    ```
 
@@ -86,9 +90,13 @@ All variables have defaults in `.env.example` - modify as needed for your enviro
 
 ### Database Migrations
 
-The application uses Alembic for database migrations.
+The application uses Alembic for database migrations. Migrations run in a separate Docker container, but you can also run them locally.
 
+**Using the migrations dependency group:**
 ```bash
+# Install migration dependencies
+uv sync --extra migrations
+
 # Apply all pending migrations
 uv run alembic upgrade head
 

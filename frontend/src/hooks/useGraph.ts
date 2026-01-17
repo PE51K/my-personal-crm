@@ -22,12 +22,12 @@ export const graphKeys = {
 };
 
 /**
- * Hook to fetch full graph data
+ * Hook to fetch full graph data with optional filters
  */
-export function useGraph() {
+export function useGraph(filters?: Partial<import('@/types').ContactListParams>) {
   return useQuery({
-    queryKey: graphKeys.data(),
-    queryFn: getGraph,
+    queryKey: [...graphKeys.data(), filters],
+    queryFn: () => getGraph(filters),
     staleTime: 30 * 1000, // 30 seconds
   });
 }

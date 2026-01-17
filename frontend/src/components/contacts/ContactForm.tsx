@@ -13,11 +13,13 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Autocomplete } from '@/components/ui/Autocomplete';
+import { Badge } from '@/components/ui/Badge';
 import { PhotoUpload } from './PhotoUpload';
 import {
   useTagSuggestions,
   useInterestSuggestions,
   useOccupationSuggestions,
+  usePositionSuggestions,
   useStatusSuggestions,
   useContactSuggestions,
 } from '@/hooks/useSuggestions';
@@ -29,6 +31,7 @@ import type {
   Tag,
   Interest,
   Occupation,
+  Position,
   Status,
   StatusInput,
 } from '@/types';
@@ -87,9 +90,19 @@ export function ContactForm({
   const [selectedInterests, setSelectedInterests] = useState<Interest[]>(
     initialData?.interests ?? []
   );
-  const [selectedOccupations, setSelectedOccupations] = useState<Occupation[]>(
-    initialData?.occupations ?? []
-  );
+  // Track occupations with their positions nested
+  const [occupationsWithPositions, setOccupationsWithPositions] = useState<
+    Array<{ occupation: Occupation; positions: Position[] }>
+  >(() => {
+    // Initialize from initialData: positions are already nested in occupations
+    if (initialData?.occupations) {
+      return initialData.occupations.map((occ) => ({
+        occupation: occ,
+        positions: occ.positions || [],
+      }));
+    }
+    return [];
+  });
   const [selectedStatus, setSelectedStatus] = useState<Status | null>(
     initialData?.status ?? null
   );
@@ -101,6 +114,7 @@ export function ContactForm({
   const [tagQuery, setTagQuery] = useState('');
   const [interestQuery, setInterestQuery] = useState('');
   const [occupationQuery, setOccupationQuery] = useState('');
+  const [positionQueries, setPositionQueries] = useState<Record<string, string>>({});
   const [statusQuery, setStatusQuery] = useState('');
   const [associationQuery, setAssociationQuery] = useState('');
 
@@ -110,6 +124,12 @@ export function ContactForm({
     useInterestSuggestions(interestQuery);
   const { data: occupationSuggestions, isLoading: loadingOccupations } =
     useOccupationSuggestions(occupationQuery);
+  // For positions, use the first active query or a default query to fetch positions
+  // We'll filter client-side by occupation
+  const activePositionQuery = Object.values(positionQueries).find((q) => q.trim().length > 0) || 
+    (occupationsWithPositions.length > 0 ? ' ' : ''); // Fetch if we have occupations
+  const { data: positionSuggestions, isLoading: loadingPositions } =
+    usePositionSuggestions(activePositionQuery);
   const { data: statusSuggestions, isLoading: loadingStatuses } =
     useStatusSuggestions(statusQuery);
 
@@ -136,7 +156,17 @@ export function ContactForm({
       });
       setSelectedTags(initialData.tags);
       setSelectedInterests(initialData.interests);
-      setSelectedOccupations(initialData.occupations);
+      // Group positions by occupation
+      if (initialData.occupations && initialData.positions) {
+        setOccupationsWithPositions(
+          initialData.occupations.map((occ) => ({
+            occupation: occ,
+            positions: initialData.positions.filter(
+              (pos) => pos.occupation_id === occ.id
+            ),
+          }))
+        );
+      }
       setSelectedStatus(initialData.status);
       setSelectedAssociations(initialData.associations);
     }
@@ -176,6 +206,13 @@ export function ContactForm({
           : selectedStatus.id
         : null;
 
+      // Build occupations with nested position_ids
+      const occupations = occupationsWithPositions.map((item) => ({
+        id: item.occupation.id,
+        name: item.occupation.name,
+        position_ids: item.positions.map((p) => ({ id: p.id, name: p.name })),
+      }));
+
       const data: ContactCreateRequest | ContactUpdateRequest = {
         first_name: formData.first_name.trim(),
         middle_name: formData.middle_name.trim() || null,
@@ -189,13 +226,13 @@ export function ContactForm({
         // Send full objects (with id and name) to support temp IDs
         tag_ids: selectedTags.map((t) => ({ id: t.id, name: t.name })),
         interest_ids: selectedInterests.map((i) => ({ id: i.id, name: i.name })),
-        occupation_ids: selectedOccupations.map((o) => ({ id: o.id, name: o.name })),
+        occupations: occupations.length > 0 ? occupations : undefined,
         association_contact_ids: selectedAssociations.map((a) => a.id),
       };
 
       await onSubmit(data);
     },
-    [formData, selectedTags, selectedInterests, selectedOccupations, selectedAssociations, selectedStatus, onSubmit, validateForm]
+    [formData, selectedTags, selectedInterests, occupationsWithPositions, selectedAssociations, selectedStatus, onSubmit, validateForm]
   );
 
   const handleInputChange = useCallback(
@@ -222,9 +259,81 @@ export function ContactForm({
   }, []);
 
   const handleCreateOccupation = useCallback((name: string): void => {
-    const newOccupation: Occupation = { id: `temp-${Date.now()}`, name };
-    setSelectedOccupations((prev) => [...prev, newOccupation]);
+    const newOccupation: Occupation = {
+      id: `temp-${Date.now()}`,
+      name,
+      positions: [],
+    };
+    setOccupationsWithPositions((prev) => [
+      ...prev,
+      { occupation: newOccupation, positions: [] },
+    ]);
   }, []);
+
+  const handleAddOccupation = useCallback((occupation: Occupation): void => {
+    setOccupationsWithPositions((prev) => {
+      // Check if already added
+      if (prev.some((item) => item.occupation.id === occupation.id)) {
+        return prev;
+      }
+      return [...prev, { occupation, positions: [] }];
+    });
+  }, []);
+
+  const handleRemoveOccupation = useCallback((occupationId: string): void => {
+    setOccupationsWithPositions((prev) =>
+      prev.filter((item) => item.occupation.id !== occupationId)
+    );
+  }, []);
+
+  const handleAddPosition = useCallback(
+    (occupationId: string, position: Position): void => {
+      setOccupationsWithPositions((prev) =>
+        prev.map((item) => {
+          if (item.occupation.id === occupationId) {
+            // Check if position already exists
+            if (item.positions.some((p) => p.id === position.id)) {
+              return item;
+            }
+            return {
+              ...item,
+              positions: [...item.positions, position],
+            };
+          }
+          return item;
+        })
+      );
+    },
+    []
+  );
+
+  const handleCreatePosition = useCallback(
+    (occupationId: string, name: string): void => {
+      const newPosition: Position = {
+        id: `temp-${Date.now()}`,
+        name,
+      };
+      handleAddPosition(occupationId, newPosition);
+    },
+    [handleAddPosition]
+  );
+
+  const handleRemovePosition = useCallback(
+    (occupationId: string, positionId: string): void => {
+      setOccupationsWithPositions((prev) =>
+        prev.map((item) => {
+          if (item.occupation.id === occupationId) {
+            return {
+              ...item,
+              positions: item.positions.filter((p) => p.id !== positionId),
+            };
+          }
+          return item;
+        })
+      );
+    },
+    []
+  );
 
   const handleCreateStatus = useCallback((name: string): void => {
     const newStatus: Status = { id: `temp-${Date.now()}`, name };
@@ -321,8 +430,8 @@ export function ContactForm({
         />
       </div>
 
-      {/* Tags, Interests, Occupations */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Tags and Interests */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Autocomplete
           label="Tags"
           placeholder="Add tags..."
@@ -355,22 +464,114 @@ export function ContactForm({
           onCreate={handleCreateInterest}
           isLoading={loadingInterests}
         />
+      </div>
+
+      {/* Occupations with Positions */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700">
+            Occupations & Positions
+          </label>
+        </div>
+
+        {/* Add Occupation */}
         <Autocomplete
-          label="Occupations"
-          placeholder="Add occupations..."
+          placeholder="Add occupation..."
           query={occupationQuery}
           onQueryChange={setOccupationQuery}
           suggestions={occupationSuggestions?.data ?? []}
-          selectedItems={selectedOccupations}
+          selectedItems={[]}
           onSelect={(item) => {
-            setSelectedOccupations((prev) => [...prev, item as Occupation]);
+            handleAddOccupation(item as Occupation);
+            setOccupationQuery('');
           }}
-          onRemove={(item) => {
-            setSelectedOccupations((prev) => prev.filter((o) => o.id !== item.id));
-          }}
+          onRemove={() => {}}
           onCreate={handleCreateOccupation}
           isLoading={loadingOccupations}
         />
+
+        {/* Occupations with their positions */}
+        {occupationsWithPositions.map(({ occupation, positions }) => {
+          const positionQuery = positionQueries[occupation.id] || '';
+          const filteredPositionSuggestions = positionSuggestions?.data.filter(
+            (pos) => {
+              const matchesQuery = positionQuery.trim() === '' || 
+                pos.name.toLowerCase().includes(positionQuery.toLowerCase());
+              const notAlreadyAdded = !positions.some((p) => p.id === pos.id);
+              return matchesQuery && notAlreadyAdded;
+            }
+          ) ?? [];
+
+          return (
+            <div
+              key={occupation.id}
+              className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-900">{occupation.name}</span>
+                  <Badge variant="primary" size="sm">
+                    {positions.length} {positions.length === 1 ? 'position' : 'positions'}
+                  </Badge>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveOccupation(occupation.id)}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Remove
+                </button>
+              </div>
+
+              {/* Positions for this occupation */}
+              <div className="space-y-2">
+                {positions.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {positions.map((position) => (
+                      <Badge
+                        key={position.id}
+                        variant="primary"
+                        removable
+                        onRemove={() => handleRemovePosition(occupation.id, position.id)}
+                      >
+                        {position.name}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add position to this occupation */}
+                <Autocomplete
+                  placeholder={`Add position to ${occupation.name}...`}
+                  query={positionQuery}
+                  onQueryChange={(query) => {
+                    setPositionQueries((prev) => ({
+                      ...prev,
+                      [occupation.id]: query,
+                    }));
+                  }}
+                  suggestions={filteredPositionSuggestions}
+                  selectedItems={[]}
+                  onSelect={(item) => {
+                    // Convert suggestion item to Position
+                    const position: Position = {
+                      id: item.id,
+                      name: item.name,
+                    };
+                    handleAddPosition(occupation.id, position);
+                    setPositionQueries((prev) => ({
+                      ...prev,
+                      [occupation.id]: '',
+                    }));
+                  }}
+                  onRemove={() => {}}
+                  onCreate={(name) => handleCreatePosition(occupation.id, name)}
+                  isLoading={loadingPositions}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Associations */}

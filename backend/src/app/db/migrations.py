@@ -3,8 +3,6 @@
 import logging
 from pathlib import Path
 
-from alembic import command
-from alembic.config import Config
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -19,6 +17,10 @@ def run_alembic_migrations() -> None:
     Raises:
         RuntimeError: If migrations fail to apply.
     """
+    # Import alembic only when needed (migrations container only)
+    from alembic import command
+    from alembic.config import Config
+
     logger.info("============================================")
     logger.info("Running database migrations")
     logger.info("============================================")
@@ -84,8 +86,9 @@ async def verify_database_connection(settings: Settings) -> None:
                 WHERE schemaname = 'public'
                 AND tablename IN (
                     'app_owner', 'statuses', 'contacts', 'tags',
-                    'interests', 'occupations', 'contact_tags',
-                    'contact_interests', 'contact_occupations',
+                    'interests', 'occupations', 'positions',
+                    'contact_tags', 'contact_interests',
+                    'contact_occupations', 'contact_occupation_positions',
                     'contact_associations'
                 )
                 ORDER BY tablename;
@@ -109,7 +112,7 @@ async def verify_database_connection(settings: Settings) -> None:
 async def initialize_app(settings: Settings) -> None:
     """Initialize application on startup.
 
-    Runs database migrations and sets up storage directory.
+    Sets up storage directory and verifies database connection.
 
     Args:
         settings: Application settings.
@@ -123,10 +126,6 @@ async def initialize_app(settings: Settings) -> None:
     logger.info("")
 
     try:
-        # Skip migrations - run them manually with: uv run alembic upgrade head
-        logger.info("Skipping automatic migrations (run manually if needed)")
-        logger.info("")
-
         # Set up storage directory
         setup_storage_directory(settings)
         logger.info("")

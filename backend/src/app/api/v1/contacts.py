@@ -69,7 +69,7 @@ async def create_contact_endpoint(
         notes=request.notes,
         tag_ids=request.tag_ids,
         interest_ids=request.interest_ids,
-        occupation_ids=request.occupation_ids,
+        occupations=request.occupations,
         association_contact_ids=request.association_contact_ids,
     )
 
@@ -85,21 +85,21 @@ async def list_contacts_endpoint(
     db: DBSession,
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
-    status_id: str | None = Query(default=None, description="Filter by status ID"),
-    tag_ids: str | None = Query(default=None, description="Filter by tag IDs (comma-separated)"),
+    status_id: str | None = Query(default=None, description="Filter by status ID (single)"),
+    status_ids: str | None = Query(default=None, description="Filter by status IDs (comma-separated, any match)"),
+    tag_ids: str | None = Query(default=None, description="Filter by tag IDs (comma-separated, any match)"),
     interest_ids: str | None = Query(
-        default=None, description="Filter by interest IDs (comma-separated)"
+        default=None, description="Filter by interest IDs (comma-separated, any match)"
     ),
     occupation_ids: str | None = Query(
-        default=None, description="Filter by occupation IDs (comma-separated)"
+        default=None, description="Filter by occupation IDs (comma-separated, any match)"
     ),
-    created_at_from: date | None = Query(
-        default=None, description="Filter by creation date (from)"
+    position_ids: str | None = Query(
+        default=None, description="Filter by position IDs (comma-separated, any match)"
     ),
-    created_at_to: date | None = Query(default=None, description="Filter by creation date (to)"),
     met_at_from: date | None = Query(default=None, description="Filter by met date (from)"),
     met_at_to: date | None = Query(default=None, description="Filter by met date (to)"),
-    search: str | None = Query(default=None, description="Search in names"),
+    search: str | None = Query(default=None, description="Search in first, middle, last name"),
     sort_by: str = Query(default="created_at", description="Sort field"),
     sort_order: str = Query(default="desc", description="Sort order (asc/desc)"),
 ) -> ContactListResponse:
@@ -113,15 +113,15 @@ async def list_contacts_endpoint(
         db: Database session.
         page: Page number (1-indexed).
         page_size: Number of items per page.
-        status_id: Filter by status ID.
-        tag_ids: Filter by tag IDs (comma-separated).
-        interest_ids: Filter by interest IDs (comma-separated).
-        occupation_ids: Filter by occupation IDs (comma-separated).
-        created_at_from: Filter by creation date (from).
-        created_at_to: Filter by creation date (to).
+        status_id: Filter by status ID (single).
+        status_ids: Filter by status IDs (comma-separated, any match).
+        tag_ids: Filter by tag IDs (comma-separated, any match).
+        interest_ids: Filter by interest IDs (comma-separated, any match).
+        occupation_ids: Filter by occupation IDs (comma-separated, any match).
+        position_ids: Filter by position IDs (comma-separated, any match).
         met_at_from: Filter by met date (from).
         met_at_to: Filter by met date (to).
-        search: Search in names.
+        search: Search in first, middle, last name.
         sort_by: Field to sort by.
         sort_order: Sort order (asc/desc).
 
@@ -132,17 +132,19 @@ async def list_contacts_endpoint(
     parsed_tag_ids = tag_ids.split(",") if tag_ids else None
     parsed_interest_ids = interest_ids.split(",") if interest_ids else None
     parsed_occupation_ids = occupation_ids.split(",") if occupation_ids else None
+    parsed_position_ids = position_ids.split(",") if position_ids else None
+    parsed_status_ids = status_ids.split(",") if status_ids else None
 
     return await list_contacts(
         db=db,
         page=page,
         page_size=page_size,
         status_id=status_id,
+        status_ids=parsed_status_ids,
         tag_ids=parsed_tag_ids,
         interest_ids=parsed_interest_ids,
         occupation_ids=parsed_occupation_ids,
-        created_at_from=created_at_from,
-        created_at_to=created_at_to,
+        position_ids=parsed_position_ids,
         met_at_from=met_at_from,
         met_at_to=met_at_to,
         search=search,
@@ -246,7 +248,7 @@ async def update_contact_endpoint(
         notes=request.notes,
         tag_ids=request.tag_ids,
         interest_ids=request.interest_ids,
-        occupation_ids=request.occupation_ids,
+        occupations=request.occupations,
         association_contact_ids=request.association_contact_ids,
     )
 

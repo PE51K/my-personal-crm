@@ -248,7 +248,7 @@ export function PersonCard({
           </div>
         )}
 
-        {/* Tags, Interests, Occupations */}
+        {/* Tags, Interests, Occupations & Positions */}
         {(contact.tags.length > 0 ||
           contact.interests.length > 0 ||
           contact.occupations.length > 0) && (
@@ -285,16 +285,40 @@ export function PersonCard({
             )}
             {contact.occupations.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Occupations</h3>
-                <div className="flex flex-wrap gap-2">
-                  {contact.occupations.map((occupation) => (
-                    <span
-                      key={occupation.id}
-                      className="px-3 py-1 text-xs font-medium bg-primary-100 text-primary-700 rounded-full border border-primary-200"
-                    >
-                      {occupation.name}
-                    </span>
-                  ))}
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Occupations & Positions</h3>
+                <div className="space-y-3">
+                  {contact.occupations.map((occupation) => {
+                    const positions = occupation.positions || [];
+                    return (
+                      <div
+                        key={occupation.id}
+                        className="border border-gray-200 rounded-lg p-3 bg-gray-50"
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="px-3 py-1 text-xs font-semibold bg-primary-100 text-primary-700 rounded-full border border-primary-200">
+                            {occupation.name}
+                          </span>
+                          {positions.length > 0 && (
+                            <span className="text-xs text-gray-500">
+                              ({positions.length} {positions.length === 1 ? 'position' : 'positions'})
+                            </span>
+                          )}
+                        </div>
+                        {positions.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-2 ml-1">
+                            {positions.map((position) => (
+                              <span
+                                key={position.id}
+                                className="px-2.5 py-0.5 text-xs font-medium bg-primary-50 text-primary-600 rounded-full border border-primary-200"
+                              >
+                                {position.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

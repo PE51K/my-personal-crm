@@ -3,7 +3,7 @@
 # =============================================================================
 # This compose file defines the API service and PostgreSQL database for the
 # Personal CRM backend. It uses Python 3.12 with uv for dependency management.
-# Migrations run automatically on startup via Alembic.
+# Migrations run in a separate container before the API starts.
 # =============================================================================
 
 services:
@@ -51,6 +51,29 @@ services:
     networks:
       - crm-network
 
+  migrations:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrations
+    container_name: personal-crm-migrations
+    environment:
+      # Database Configuration (Required)
+      - POSTGRES_HOST=${POSTGRES_HOST:-db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-personal_crm}
+      - POSTGRES_USER=${POSTGRES_USER:-crm_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-crm_password}
+      # Application Configuration (Optional - have defaults)
+      - APP_ENV=${APP_ENV:-development}
+      - APP_DEBUG=${APP_DEBUG:-true}
+      - APP_LOG_LEVEL=${APP_LOG_LEVEL:-INFO}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - crm-network
+
   api:
     build:
       context: .
@@ -90,6 +113,8 @@ services:
       # File Storage
       - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-5}
     depends_on:
+      migrations:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       minio:

@@ -2,11 +2,13 @@
 
 import logging
 import uuid
+from datetime import date
+from uuid import UUID
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Contact, ContactAssociation
+from app.models import Contact, ContactAssociation, ContactOccupation, Interest, Occupation, Position, Tag
 from app.schemas.graph import (
     EdgeResponse,
     GraphEdge,
@@ -23,18 +25,137 @@ from app.utils.errors import (
 logger = logging.getLogger(__name__)
 
 
-async def get_graph(db: AsyncSession) -> GraphResponse:
-    """Get all contacts and associations for graph visualization.
+async def get_graph(
+    db: AsyncSession,
+    status_id: str | None = None,
+    status_ids: list[str] | None = None,
+    tag_ids: list[str] | None = None,
+    interest_ids: list[str] | None = None,
+    occupation_ids: list[str] | None = None,
+    position_ids: list[str] | None = None,
+    met_at_from: date | None = None,
+    met_at_to: date | None = None,
+    search: str | None = None,
+) -> GraphResponse:
+    """Get contacts and associations for graph visualization with optional filtering.
 
     Args:
         db: Database session.
+        status_id: Filter by status ID (single).
+        status_ids: Filter by status IDs (multiple, any match).
+        tag_ids: Filter by tag IDs (any match).
+        interest_ids: Filter by interest IDs (any match).
+        occupation_ids: Filter by occupation IDs (any match).
+        position_ids: Filter by position IDs (any match).
+        met_at_from: Filter by met date (from).
+        met_at_to: Filter by met date (to).
+        search: Search in first, middle, last name.
 
     Returns:
         Graph response with nodes and edges.
     """
-    # Fetch all contacts
-    stmt = select(Contact)
-    result = await db.execute(stmt)
+    # Build base query
+    query = select(Contact)
+
+    # Apply filters (similar to list_contacts)
+    if status_id:
+        query = query.where(Contact.status_id == UUID(status_id))
+    elif status_ids:
+        status_uuid_ids = [UUID(sid) for sid in status_ids]
+        query = query.where(Contact.status_id.in_(status_uuid_ids))
+
+    if met_at_from:
+        query = query.where(Contact.met_at >= met_at_from)
+
+    if met_at_to:
+        query = query.where(Contact.met_at <= met_at_to)
+
+    if search:
+        search_words = search.strip().lower().split()
+        or_conditions = []
+        for word in search_words:
+            pattern = f"%{word}%"
+            or_conditions.extend(
+                [
+                    Contact.first_name.ilike(pattern),
+                    Contact.middle_name.ilike(pattern),
+                    Contact.last_name.ilike(pattern),
+                ]
+            )
+        query = query.where(or_(*or_conditions))
+
+    # Get contact IDs filtered by tags/interests/occupations/positions
+    contact_ids_to_filter: set[UUID] | None = None
+
+    if tag_ids:
+        tag_uuid_ids = [UUID(tid) for tid in tag_ids]
+        tag_result = await db.execute(
+            select(Contact.id)
+            .join(Contact.tags)
+            .where(Tag.id.in_(tag_uuid_ids))
+            .group_by(Contact.id)
+        )
+        tag_contact_ids = {row[0] for row in tag_result}
+        contact_ids_to_filter = (
+            tag_contact_ids
+            if contact_ids_to_filter is None
+            else contact_ids_to_filter & tag_contact_ids
+        )
+
+    if interest_ids:
+        interest_uuid_ids = [UUID(iid) for iid in interest_ids]
+        interest_result = await db.execute(
+            select(Contact.id)
+            .join(Contact.interests)
+            .where(Interest.id.in_(interest_uuid_ids))
+            .group_by(Contact.id)
+        )
+        interest_contact_ids = {row[0] for row in interest_result}
+        contact_ids_to_filter = (
+            interest_contact_ids
+            if contact_ids_to_filter is None
+            else contact_ids_to_filter & interest_contact_ids
+        )
+
+    if occupation_ids:
+        occupation_uuid_ids = [UUID(oid) for oid in occupation_ids]
+        occupation_result = await db.execute(
+            select(Contact.id)
+            .join(Contact.contact_occupations)
+            .where(ContactOccupation.occupation_id.in_(occupation_uuid_ids))
+            .group_by(Contact.id)
+        )
+        occupation_contact_ids = {row[0] for row in occupation_result}
+        contact_ids_to_filter = (
+            occupation_contact_ids
+            if contact_ids_to_filter is None
+            else contact_ids_to_filter & occupation_contact_ids
+        )
+
+    if position_ids:
+        position_uuid_ids = [UUID(pid) for pid in position_ids]
+        position_result = await db.execute(
+            select(Contact.id)
+            .join(Contact.contact_occupations)
+            .join(ContactOccupation.positions)
+            .where(Position.id.in_(position_uuid_ids))
+            .group_by(Contact.id)
+        )
+        position_contact_ids = {row[0] for row in position_result}
+        contact_ids_to_filter = (
+            position_contact_ids
+            if contact_ids_to_filter is None
+            else contact_ids_to_filter & position_contact_ids
+        )
+
+    if contact_ids_to_filter is not None:
+        if not contact_ids_to_filter:
+            # No contacts match the filters
+            return GraphResponse(nodes=[], edges=[])
+        query = query.where(Contact.id.in_(contact_ids_to_filter))
+
+    # Execute query
+    result = await db.execute(query)
     contacts = result.scalars().all()
 
     # Build nodes
@@ -59,20 +180,31 @@ async def get_graph(db: AsyncSession) -> GraphResponse:
             )
         )
 
-    # Fetch all associations (edges)
-    stmt = select(ContactAssociation)
-    result = await db.execute(stmt)
-    associations = result.scalars().all()
-
-    edges = [
-        GraphEdge(
-            id=str(edge.id),
-            source_id=str(edge.source_contact_id),
-            target_id=str(edge.target_contact_id),
-            label=edge.label,
+    # Fetch associations (edges) only for filtered contacts
+    contact_id_set = {contact.id for contact in contacts}
+    if contact_id_set:
+        stmt = select(ContactAssociation).where(
+            or_(
+                ContactAssociation.source_contact_id.in_(contact_id_set),
+                ContactAssociation.target_contact_id.in_(contact_id_set),
+            )
         )
-        for edge in associations
-    ]
+        result = await db.execute(stmt)
+        associations = result.scalars().all()
+
+        # Only include edges where both source and target are in filtered contacts
+        edges = [
+            GraphEdge(
+                id=str(edge.id),
+                source_id=str(edge.source_contact_id),
+                target_id=str(edge.target_contact_id),
+                label=edge.label,
+            )
+            for edge in associations
+            if edge.source_contact_id in contact_id_set and edge.target_contact_id in contact_id_set
+        ]
+    else:
+        edges = []
 
     return GraphResponse(nodes=nodes, edges=edges)
 

@@ -4,16 +4,16 @@ import uuid
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, Float, ForeignKey, Integer, Text, func
+from sqlalchemy import Date, Float, ForeignKey, Index, Integer, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
-from app.models.tables import contact_interests, contact_occupations, contact_tags
+from app.models.tables import contact_interests, contact_tags
 
 if TYPE_CHECKING:
-    from app.models.association import ContactAssociation
-    from app.models.lookup import Interest, Occupation, Tag
+    from app.models.association import ContactAssociation, ContactOccupation
+    from app.models.lookup import Interest, Occupation, Position, Tag
     from app.models.status import Status
 
 
@@ -25,6 +25,11 @@ class Contact(Base):
     """
 
     __tablename__ = "contacts"
+    __table_args__ = (
+        Index("idx_contacts_status_id", "status_id"),
+        Index("idx_contacts_created_at", "created_at"),
+        Index("idx_contacts_met_at", "met_at"),
+    )
 
     # Primary key
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -56,8 +61,10 @@ class Contact(Base):
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    # updated_at is managed by PostgreSQL trigger (see migrations)
     updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now(), nullable=False
+        server_default=func.now(),
+        nullable=False
     )
 
     # Relationships
@@ -66,8 +73,8 @@ class Contact(Base):
     interests: Mapped[list["Interest"]] = relationship(
         secondary=contact_interests, back_populates="contacts"
     )
-    occupations: Mapped[list["Occupation"]] = relationship(
-        secondary=contact_occupations, back_populates="contacts"
+    contact_occupations: Mapped[list["ContactOccupation"]] = relationship(
+        back_populates="contact", cascade="all, delete-orphan"
     )
 
     # Self-referential relationships for contact associations (graph edges)

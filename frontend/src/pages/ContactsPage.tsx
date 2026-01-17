@@ -87,7 +87,7 @@ export function ContactsPage(): ReactNode {
         {/* Filters */}
         {showFilters && (
           <div className="max-w-md">
-            <FilterPanel filters={filters} onFiltersChange={handleFiltersChange} />
+            <FilterPanel filters={filters} onFiltersChange={handleFiltersChange} showStatusFilter={true} />
           </div>
         )}
 

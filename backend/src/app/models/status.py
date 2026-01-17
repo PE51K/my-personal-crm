@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Integer, Text, func
+from sqlalchemy import Boolean, Index, Integer, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,6 +22,9 @@ class Status(Base):
     """
 
     __tablename__ = "statuses"
+    __table_args__ = (
+        Index("idx_statuses_is_active", "is_active"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
@@ -31,5 +34,5 @@ class Status(Base):
 
     # Relationships
     contacts: Mapped[list["Contact"]] = relationship(
-        back_populates="status", cascade="all, delete-orphan"
+        back_populates="status"
     )
