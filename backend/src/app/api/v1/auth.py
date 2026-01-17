@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, status
 
-from app.core.deps import CurrentOwner, SupabaseClient
+from app.api.dependencies import CurrentOwner, DBSession
 from app.schemas.auth import (
     AuthTokenResponse,
     BootstrapRequest,
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
     description="Check if the application has been initialized with an owner account.",
 )
 async def get_bootstrap_status(
-    supabase: SupabaseClient,
+    db: DBSession,
 ) -> BootstrapStatusResponse:
     """Check if the application has been initialized.
 
@@ -37,12 +37,12 @@ async def get_bootstrap_status(
     and does not require authentication.
 
     Args:
-        supabase: Supabase client instance.
+        db: Database session.
 
     Returns:
         Bootstrap status response indicating if initialized.
     """
-    initialized = check_bootstrap_status(supabase)
+    initialized = await check_bootstrap_status(db)
     return BootstrapStatusResponse(initialized=initialized)
 
 
@@ -70,19 +70,19 @@ async def get_bootstrap_status(
 )
 async def bootstrap(
     request: BootstrapRequest,
-    supabase: SupabaseClient,
+    db: DBSession,
 ) -> AuthTokenResponse:
     """Create the owner account and initialize the application.
 
-    Creates a Supabase Auth user, inserts the app_owner record,
-    seeds default statuses, and returns authentication tokens.
+    Creates the app_owner record with hashed password and
+    returns authentication tokens.
 
     This endpoint can only be called once. Subsequent calls will
     return HTTP 409.
 
     Args:
         request: Bootstrap request with email and password.
-        supabase: Supabase client instance.
+        db: Database session.
 
     Returns:
         Authentication tokens and user information.
@@ -90,8 +90,8 @@ async def bootstrap(
     Raises:
         AuthAlreadyInitializedError: If app is already initialized.
     """
-    return bootstrap_owner(
-        supabase=supabase,
+    return await bootstrap_owner(
+        db=db,
         email=request.email,
         password=request.password,
     )
@@ -120,16 +120,16 @@ async def bootstrap(
 )
 async def login(
     request: LoginRequest,
-    supabase: SupabaseClient,
+    db: DBSession,
 ) -> AuthTokenResponse:
     """Authenticate user and return tokens.
 
-    Verifies credentials against Supabase Auth and returns JWT tokens
-    if successful. Only the app owner can authenticate.
+    Verifies credentials and returns JWT tokens if successful.
+    Only the app owner can authenticate.
 
     Args:
         request: Login request with email and password.
-        supabase: Supabase client instance.
+        db: Database session.
 
     Returns:
         Authentication tokens and user information.
@@ -137,8 +137,8 @@ async def login(
     Raises:
         AuthInvalidCredentialsError: If credentials are invalid.
     """
-    return login_user(
-        supabase=supabase,
+    return await login_user(
+        db=db,
         email=request.email,
         password=request.password,
     )
@@ -153,21 +153,21 @@ async def login(
 async def logout(
     request: LogoutRequest,
     current_user: CurrentOwner,
-    supabase: SupabaseClient,
+    db: DBSession,
 ) -> LogoutResponse:
     """Invalidate the current session.
 
-    Signs out the user from Supabase, invalidating the session.
+    With JWT-based auth, logout is handled client-side by discarding tokens.
 
     Args:
         request: Logout request with refresh token.
         current_user: Current authenticated user (required).
-        supabase: Supabase client instance.
+        db: Database session.
 
     Returns:
         Success message.
     """
-    logout_user(supabase, request.refresh_token)
+    await logout_user(db, request.refresh_token)
     return LogoutResponse(message="Successfully logged out")
 
 

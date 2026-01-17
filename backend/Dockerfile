@@ -54,9 +54,10 @@ WORKDIR /app
 # Copy the virtual environment from builder
 COPY --from=builder --chown=appuser:appgroup /app/.venv /app/.venv
 
-# Copy application source code and migrations
+# Copy application source code and alembic migrations
 COPY --from=builder --chown=appuser:appgroup /app/src /app/src
-COPY --from=builder --chown=appuser:appgroup /app/migrations /app/migrations
+COPY --from=builder --chown=appuser:appgroup /app/alembic /app/alembic
+COPY --from=builder --chown=appuser:appgroup /app/alembic.ini /app/alembic.ini
 
 # Set environment variables
 ENV PATH="/app/.venv/bin:$PATH"

@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter
 
-from app.core.deps import CurrentOwner, SupabaseClient
-from app.core.errors import ContactNotFoundError, StatusNotFoundError
+from app.api.dependencies import CurrentOwner, DBSession
+from app.utils.errors import ContactNotFoundError, StatusNotFoundError
 from app.schemas.kanban import KanbanMoveRequest, KanbanMoveResponse
 
 router = APIRouter(prefix="/kanban", tags=["Kanban"])

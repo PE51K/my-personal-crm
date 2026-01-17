@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, status
 
-from app.core.deps import CurrentOwner, SupabaseClient
+from app.api.dependencies import CurrentOwner, DBSession
 from app.schemas.graph import (
     EdgeCreateRequest,
     EdgeResponse,
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/graph", tags=["Graph"])
 )
 async def get_graph_endpoint(
     current_user: CurrentOwner,
-    supabase: SupabaseClient,
+    db: DBSession,
 ) -> GraphResponse:
     """Get all contacts and associations for graph visualization.
 
@@ -33,12 +33,12 @@ async def get_graph_endpoint(
 
     Args:
         current_user: Current authenticated owner.
-        supabase: Supabase client instance.
+        db: Database session.
 
     Returns:
         Graph with nodes and edges.
     """
-    return get_graph(supabase)
+    return await get_graph(db)
 
 
 @router.post(
@@ -79,7 +79,7 @@ async def get_graph_endpoint(
 async def create_edge_endpoint(
     request: EdgeCreateRequest,
     current_user: CurrentOwner,
-    supabase: SupabaseClient,
+    db: DBSession,
 ) -> EdgeResponse:
     """Create an association between two contacts.
 
@@ -89,7 +89,7 @@ async def create_edge_endpoint(
     Args:
         request: Edge creation request.
         current_user: Current authenticated owner.
-        supabase: Supabase client instance.
+        db: Database session.
 
     Returns:
         Created edge.
@@ -98,8 +98,8 @@ async def create_edge_endpoint(
         ContactNotFoundError: If either contact doesn't exist.
         GraphEdgeExistsError: If edge already exists.
     """
-    return create_edge(
-        supabase=supabase,
+    return await create_edge(
+        db=db,
         source_id=request.source_id,
         target_id=request.target_id,
         label=request.label,
@@ -130,7 +130,7 @@ async def create_edge_endpoint(
 async def delete_edge_endpoint(
     edge_id: str,
     current_user: CurrentOwner,
-    supabase: SupabaseClient,
+    db: DBSession,
 ) -> None:
     """Delete an association.
 
@@ -140,9 +140,10 @@ async def delete_edge_endpoint(
     Args:
         edge_id: Edge ID to delete.
         current_user: Current authenticated owner.
-        supabase: Supabase client instance.
+        db: Database session.
 
     Raises:
         GraphEdgeNotFoundError: If edge doesn't exist.
     """
-    delete_edge(supabase, edge_id)
+    await delete_edge(db, edge_id)
+

@@ -1,12 +1,56 @@
 # =============================================================================
-# Backend Service - FastAPI with uvicorn
+# Backend Service - FastAPI with uvicorn and PostgreSQL
 # =============================================================================
-# This compose file defines the API service for the Personal CRM backend.
-# It uses Python 3.12 with uv for dependency management.
-# Migrations and storage bucket setup run automatically on startup.
+# This compose file defines the API service and PostgreSQL database for the
+# Personal CRM backend. It uses Python 3.12 with uv for dependency management.
+# Migrations run automatically on startup via Alembic.
 # =============================================================================
 
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: personal-crm-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-crm_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-crm_password}
+      - POSTGRES_DB=${POSTGRES_DB:-personal_crm}
+    volumes:
+      # Persist database data locally
+      - ./volumes/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crm_user} -d ${POSTGRES_DB:-personal_crm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - crm-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: personal-crm-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      # Persist MinIO data locally
+      - ./volumes/minio:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - crm-network
+
   api:
     build:
       context: .
@@ -18,22 +62,38 @@ services:
       # Mount source code for hot reload during development
       - ./src:/app/src:ro
     environment:
-      # Supabase Configuration (Required)
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      - SUPABASE_DB_URL=${SUPABASE_DB_URL}
-      - SUPABASE_STORAGE_BUCKET=${SUPABASE_STORAGE_BUCKET:-contact-photos}
+      # Database Configuration (Required)
+      - POSTGRES_HOST=${POSTGRES_HOST:-db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-personal_crm}
+      - POSTGRES_USER=${POSTGRES_USER:-crm_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-crm_password}
       # Application Configuration (Optional - have defaults)
       - APP_ENV=${APP_ENV:-development}
       - APP_DEBUG=${APP_DEBUG:-true}
       - APP_LOG_LEVEL=${APP_LOG_LEVEL:-INFO}
       # Security (Optional - have defaults)
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-change-in-production}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       - CORS_ORIGINS=${CORS_ORIGINS:-["http://localhost:3000"]}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
       - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-7}
       # Server (Optional - have defaults)
       - HOST=${HOST:-0.0.0.0}
       - PORT=${PORT:-8000}
+      # MinIO Configuration
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio:9000}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+      - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME:-contact-photos}
+      - MINIO_SECURE=${MINIO_SECURE:-false}
+      # File Storage
+      - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-5}
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

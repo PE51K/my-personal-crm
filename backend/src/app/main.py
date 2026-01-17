@@ -9,9 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
-from app.core.config import get_settings
-from app.core.errors import APIError
-from app.core.startup import initialize_app
+from app.core.settings import get_settings
+from app.utils.errors import APIError
+from app.db.migrations import initialize_app
 
 # Configure logging
 logging.basicConfig(
@@ -35,15 +35,15 @@ async def lifespan(app: FastAPI):  # noqa: ANN201
     """
     # Startup
     settings = get_settings()
-    logger.info("Starting Personal CRM API in %s mode", settings.app_env)
-    
+    logger.info("Starting Personal CRM API")
+
     # Initialize database and storage
     try:
         initialize_app(settings)
     except Exception as e:
         logger.error("Failed to initialize application: %s", e)
         raise
-    
+
     yield
     # Shutdown
     logger.info("Shutting down Personal CRM API")
@@ -61,19 +61,19 @@ def create_app() -> FastAPI:
         title="Personal CRM API",
         description="Backend API for Personal CRM - manage your contacts and relationships",
         version="0.1.0",
-        docs_url="/api/docs" if settings.app_debug else None,
-        redoc_url="/api/redoc" if settings.app_debug else None,
-        openapi_url="/api/openapi.json" if settings.app_debug else None,
+        docs_url="/api/docs",
+        redoc_url="/api/redoc",
+        openapi_url="/api/openapi.json",
         lifespan=lifespan,
     )
 
     # Configure CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=settings.app.cors.origins,
+        allow_credentials=settings.app.cors.allow_credentials,
+        allow_methods=settings.app.cors.allow_methods,
+        allow_headers=settings.app.cors.allow_headers,
     )
 
     # Include API router
@@ -112,7 +112,7 @@ def create_app() -> FastAPI:
         """
         logger.exception("Unexpected error: %s", exc)
 
-        # In debug mode, include error details
+        # Return generic error response
         detail: dict[str, Any] = {
             "error": {
                 "code": "INTERNAL_ERROR",
@@ -120,9 +120,6 @@ def create_app() -> FastAPI:
                 "details": {},
             }
         }
-
-        if settings.app_debug:
-            detail["error"]["details"]["exception"] = str(exc)
 
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -160,7 +157,7 @@ def create_app() -> FastAPI:
         return {
             "name": "Personal CRM API",
             "version": "0.1.0",
-            "docs": "/api/docs" if settings.app_debug else "disabled",
+            "docs": "/api/docs",
         }
 
     return app

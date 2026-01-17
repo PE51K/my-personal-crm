@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter, Query, status
 
-from app.core.deps import CurrentOwner, SupabaseClient
-from app.core.errors import StatusNotFoundError
+from app.api.dependencies import CurrentOwner, DBSession
+from app.utils.errors import StatusNotFoundError
 from app.schemas.status import (
     StatusCreateRequest,
     StatusListResponse,

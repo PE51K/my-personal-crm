@@ -1,47 +1,54 @@
 """Authentication business logic."""
 
 import logging
-from datetime import datetime
+import uuid
 
-from supabase_auth.errors import AuthApiError
-from supabase import Client
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
-from app.core.errors import (
+from app.core.settings import get_settings
+from app.utils.errors import (
     AuthAlreadyInitializedError,
     AuthInvalidCredentialsError,
     InternalError,
 )
+from app.utils.security import (
+    create_access_token,
+    create_refresh_token,
+    hash_password,
+    verify_password,
+)
+from app.models import AppOwner
 from app.schemas.auth import AuthTokenResponse, UserResponse
 
 logger = logging.getLogger(__name__)
 
 
-def check_bootstrap_status(supabase: Client) -> bool:
+async def check_bootstrap_status(db: AsyncSession) -> bool:
     """Check if the application has been initialized with an owner.
 
     Args:
-        supabase: Supabase client instance.
+        db: Database session.
 
     Returns:
         True if app_owner exists, False otherwise.
     """
-    result = supabase.table("app_owner").select("id").limit(1).execute()
-    return len(result.data) > 0
+    result = await db.execute(select(AppOwner).limit(1))
+    owner = result.scalar_one_or_none()
+    return owner is not None
 
 
-def bootstrap_owner(
-    supabase: Client,
+async def bootstrap_owner(
+    db: AsyncSession,
     email: str,
     password: str,
 ) -> AuthTokenResponse:
     """Create the owner account and initialize the application.
 
-    Creates a Supabase Auth user, inserts the app_owner record,
-    and seeds default statuses.
+    Creates the app_owner record with hashed password.
 
     Args:
-        supabase: Supabase client instance.
+        db: Database session.
         email: Owner's email address.
         password: Owner's password.
 
@@ -55,86 +62,62 @@ def bootstrap_owner(
     settings = get_settings()
 
     # Check if already initialized
-    if check_bootstrap_status(supabase):
+    if await check_bootstrap_status(db):
         raise AuthAlreadyInitializedError
 
     try:
-        # Create user via Supabase Auth admin API
-        auth_response = supabase.auth.admin.create_user(
-            {
-                "email": email,
-                "password": password,
-                "email_confirm": True,
-            }
+        # Generate user ID
+        user_id = uuid.uuid4()
+
+        # Hash password
+        password_hash = hash_password(password)
+
+        # Create app_owner record
+        owner = AppOwner(
+            id=1,
+            user_id=user_id,
+            email=email,
+            password_hash=password_hash,
         )
-        user = auth_response.user
-        if not user:
-            raise InternalError(detail="Failed to create user")
+        db.add(owner)
+        await db.flush()  # Flush to get created_at
 
-        user_id = user.id
-        created_at = user.created_at
+        # Generate tokens
+        access_token = create_access_token(str(user_id), email)
+        refresh_token = create_refresh_token(str(user_id), email)
 
-        # Insert app_owner record
-        supabase.table("app_owner").insert(
-            {
-                "id": 1,
-                "supabase_user_id": user_id,
-                "email": email,
-            }
-        ).execute()
-
-        # Sign in to get tokens
-        sign_in_response = supabase.auth.sign_in_with_password(
-            {
-                "email": email,
-                "password": password,
-            }
-        )
-
-        if not sign_in_response.session:
-            raise InternalError(detail="Failed to create session")
-
-        session = sign_in_response.session
-
-        # Handle created_at - it may be a string or datetime object
-        parsed_created_at = None
-        if created_at:
-            if isinstance(created_at, str):
-                parsed_created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-            elif isinstance(created_at, datetime):
-                parsed_created_at = created_at
+        # Commit transaction
+        await db.commit()
 
         return AuthTokenResponse(
             user=UserResponse(
-                id=user_id,
+                id=str(user_id),
                 email=email,
-                created_at=parsed_created_at,
+                created_at=owner.created_at,
             ),
-            access_token=session.access_token,
-            refresh_token=session.refresh_token,
+            access_token=access_token,
+            refresh_token=refresh_token,
             token_type="bearer",
-            expires_in=settings.access_token_expire_minutes * 60,
+            expires_in=settings.security.access_token_expire_minutes * 60,
         )
 
     except AuthAlreadyInitializedError:
         raise
-    except AuthApiError as e:
-        logger.exception("Auth API error during bootstrap")
-        raise InternalError(detail=str(e)) from e
     except Exception as e:
+        await db.rollback()
         logger.exception("Unexpected error during bootstrap")
         raise InternalError(detail=str(e)) from e
 
 
-def login_user(
-    supabase: Client,
+async def login_user(
+    db: AsyncSession,
     email: str,
     password: str,
 ) -> AuthTokenResponse:
     """Authenticate user and return tokens.
 
     Args:
-        supabase: Supabase client instance.
+        db: Database session.
         email: User's email address.
         password: User's password.
 
@@ -148,71 +131,54 @@ def login_user(
     settings = get_settings()
 
     try:
-        response = supabase.auth.sign_in_with_password(
-            {
-                "email": email,
-                "password": password,
-            }
+        # Get owner by email
+        result = await db.execute(
+            select(AppOwner).where(AppOwner.email == email)
         )
+        owner = result.scalar_one_or_none()
 
-        if not response.session or not response.user:
+        # Check if owner exists and has password hash
+        if not owner or not owner.password_hash:
             raise AuthInvalidCredentialsError
 
-        user = response.user
-        session = response.session
-
-        # Verify user is the app owner
-        owner_result = (
-            supabase.table("app_owner").select("*").eq("supabase_user_id", user.id).execute()
-        )
-
-        if not owner_result.data:
-            # User exists but is not the owner - this shouldn't happen
-            # but we handle it for security
+        # Verify password
+        if not verify_password(password, owner.password_hash):
             raise AuthInvalidCredentialsError
 
-        # Handle created_at - it may be a string or datetime object
-        parsed_created_at = None
-        if user.created_at:
-            if isinstance(user.created_at, str):
-                parsed_created_at = datetime.fromisoformat(user.created_at.replace("Z", "+00:00"))
-            elif isinstance(user.created_at, datetime):
-                parsed_created_at = user.created_at
+        # Generate tokens
+        user_id_str = str(owner.user_id)
+        access_token = create_access_token(user_id_str, owner.email)
+        refresh_token = create_refresh_token(user_id_str, owner.email)
 
         return AuthTokenResponse(
             user=UserResponse(
-                id=user.id,
-                email=user.email or email,
-                created_at=parsed_created_at,
+                id=user_id_str,
+                email=owner.email,
+                created_at=owner.created_at,
             ),
-            access_token=session.access_token,
-            refresh_token=session.refresh_token,
+            access_token=access_token,
+            refresh_token=refresh_token,
             token_type="bearer",
-            expires_in=settings.access_token_expire_minutes * 60,
+            expires_in=settings.security.access_token_expire_minutes * 60,
         )
 
     except AuthInvalidCredentialsError:
         raise
-    except AuthApiError as e:
-        if "Invalid login credentials" in str(e):
-            raise AuthInvalidCredentialsError from e
-        logger.exception("Auth API error during login")
-        raise InternalError(detail=str(e)) from e
     except Exception as e:
         logger.exception("Unexpected error during login")
         raise InternalError(detail=str(e)) from e
 
 
-def logout_user(supabase: Client, refresh_token: str) -> None:
+async def logout_user(db: AsyncSession, refresh_token: str) -> None:
     """Invalidate user session.
 
+    With JWT-based auth, we don't need to do anything server-side for logout.
+    The client should discard the tokens. This function exists for API compatibility.
+
     Args:
-        supabase: Supabase client instance.
-        refresh_token: Refresh token to invalidate.
+        db: Database session (unused).
+        refresh_token: Refresh token to invalidate (unused).
     """
-    try:
-        # Sign out the user - this invalidates the session
-        supabase.auth.sign_out()
-    except Exception:
-        # Log but don't fail - logout should always succeed from client's perspective
-        logger.exception("Error during logout")
+    # With stateless JWT tokens, logout is handled client-side
+    # Token blacklisting could be implemented here if needed
+    pass

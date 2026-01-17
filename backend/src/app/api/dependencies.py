@@ -1,45 +1,28 @@
 """Dependency injection for FastAPI endpoints."""
 
+import uuid
 from typing import Annotated
 
 from fastapi import Depends, Header
-from supabase import Client, create_client
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import Settings, get_settings
-from app.core.errors import (
+from app.core.settings import Settings, get_settings
+from app.db.database import get_db
+from app.utils.errors import (
     AuthForbiddenError,
     AuthTokenExpiredError,
     AuthTokenInvalidError,
     AuthUnauthorizedError,
 )
-from app.core.security import (
+from app.utils.security import (
     TokenExpiredError,
     TokenInvalidError,
     TokenPayload,
     extract_bearer_token,
     verify_jwt_token,
 )
-
-
-def get_supabase_client(
-    settings: Annotated[Settings, Depends(get_settings)],
-) -> Client:
-    """Get Supabase client instance.
-
-    Creates a Supabase client using the service role key for
-    full database access. This should only be used in backend
-    operations where RLS needs to be bypassed.
-
-    Args:
-        settings: Application settings.
-
-    Returns:
-        Supabase client instance.
-    """
-    return create_client(
-        settings.supabase_url,
-        settings.supabase_service_role_key,
-    )
+from app.models import AppOwner
 
 
 async def get_token_payload(
@@ -72,7 +55,7 @@ async def get_token_payload(
 
 async def get_current_user(
     token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
-    supabase: Annotated[Client, Depends(get_supabase_client)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict:
     """Get current authenticated user.
 
@@ -81,7 +64,7 @@ async def get_current_user(
 
     Args:
         token_payload: Verified JWT token payload.
-        supabase: Supabase client instance.
+        db: Database session.
 
     Returns:
         User information dictionary.
@@ -89,19 +72,24 @@ async def get_current_user(
     Raises:
         AuthForbiddenError: If user is not the app owner.
     """
-    user_id = token_payload.sub
+    try:
+        user_id = uuid.UUID(token_payload.sub)
+    except ValueError as e:
+        raise AuthTokenInvalidError(detail="Invalid user ID in token") from e
 
     # Check if user is the app owner
-    result = supabase.table("app_owner").select("*").eq("supabase_user_id", user_id).execute()
+    result = await db.execute(
+        select(AppOwner).where(AppOwner.user_id == user_id)
+    )
+    owner = result.scalar_one_or_none()
 
-    if not result.data:
+    if not owner:
         raise AuthForbiddenError
 
-    owner = result.data[0]
     return {
-        "id": user_id,
-        "email": owner.get("email") or token_payload.email,
-        "created_at": owner.get("created_at"),
+        "id": str(owner.user_id),
+        "email": owner.email or token_payload.email,
+        "created_at": owner.created_at,
     }
 
 
@@ -126,5 +114,5 @@ async def get_current_owner(
 # Type aliases for cleaner endpoint signatures
 CurrentUser = Annotated[dict, Depends(get_current_user)]
 CurrentOwner = Annotated[dict, Depends(get_current_owner)]
-SupabaseClient = Annotated[Client, Depends(get_supabase_client)]
+DBSession = Annotated[AsyncSession, Depends(get_db)]
 AppSettings = Annotated[Settings, Depends(get_settings)]

@@ -1,85 +1,85 @@
 """Graph business logic."""
 
 import logging
+import uuid
 
-from supabase import Client
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.core.errors import (
+from app.utils.errors import (
     ContactNotFoundError,
     GraphEdgeExistsError,
     GraphEdgeNotFoundError,
 )
+from app.services.storage import get_file_url
+from app.models import Contact, ContactAssociation
 from app.schemas.graph import (
     EdgeResponse,
     GraphEdge,
     GraphNode,
     GraphResponse,
 )
-from app.services.supabase import get_signed_photo_url
 
 logger = logging.getLogger(__name__)
 
 
-def get_graph(supabase: Client) -> GraphResponse:
+async def get_graph(db: AsyncSession) -> GraphResponse:
     """Get all contacts and associations for graph visualization.
 
     Args:
-        supabase: Supabase client instance.
+        db: Database session.
 
     Returns:
         Graph response with nodes and edges.
     """
     # Fetch all contacts
-    contacts_result = (
-        supabase.table("contacts")
-        .select("id, first_name, last_name, photo_path, position_x, position_y")
-        .execute()
-    )
+    stmt = select(Contact)
+    result = await db.execute(stmt)
+    contacts = result.scalars().all()
 
     # Build nodes
     nodes = []
-    for contact in contacts_result.data:
+    for contact in contacts:
         # Generate signed photo URL if photo exists
         photo_url = None
-        if contact.get("photo_path"):
+        if contact.photo_path:
             try:
-                photo_url, _ = get_signed_photo_url(supabase, contact["photo_path"])
+                photo_url = get_file_url(contact.photo_path)
             except Exception:
                 logger.warning("Failed to generate signed URL for photo")
 
         nodes.append(
             GraphNode(
-                id=contact["id"],
-                first_name=contact["first_name"],
-                last_name=contact.get("last_name"),
+                id=str(contact.id),
+                first_name=contact.first_name,
+                last_name=contact.last_name,
                 photo_url=photo_url,
-                position_x=contact.get("position_x"),
-                position_y=contact.get("position_y"),
+                position_x=contact.position_x,
+                position_y=contact.position_y,
             )
         )
 
     # Fetch all associations (edges)
-    edges_result = (
-        supabase.table("contact_associations")
-        .select("id, source_contact_id, target_contact_id, label")
-        .execute()
-    )
+    stmt = select(ContactAssociation)
+    result = await db.execute(stmt)
+    associations = result.scalars().all()
 
     edges = [
         GraphEdge(
-            id=edge["id"],
-            source_id=edge["source_contact_id"],
-            target_id=edge["target_contact_id"],
-            label=edge.get("label"),
+            id=str(edge.id),
+            source_id=str(edge.source_contact_id),
+            target_id=str(edge.target_contact_id),
+            label=edge.label,
         )
-        for edge in edges_result.data
+        for edge in associations
     ]
 
     return GraphResponse(nodes=nodes, edges=edges)
 
 
-def create_edge(
-    supabase: Client,
+async def create_edge(
+    db: AsyncSession,
     source_id: str,
     target_id: str,
     label: str | None = None,
@@ -87,7 +87,7 @@ def create_edge(
     """Create an association between two contacts.
 
     Args:
-        supabase: Supabase client instance.
+        db: Database session.
         source_id: Source contact ID.
         target_id: Target contact ID.
         label: Optional edge label.
@@ -99,63 +99,78 @@ def create_edge(
         ContactNotFoundError: If either contact doesn't exist.
         GraphEdgeExistsError: If edge already exists.
     """
+    # Convert string IDs to UUIDs
+    try:
+        source_uuid = uuid.UUID(source_id)
+        target_uuid = uuid.UUID(target_id)
+    except ValueError as e:
+        raise ContactNotFoundError(source_id) from e
+
     # Verify both contacts exist
-    for contact_id in [source_id, target_id]:
-        result = supabase.table("contacts").select("id").eq("id", contact_id).execute()
-        if not result.data:
-            raise ContactNotFoundError(contact_id)
+    for contact_id in [source_uuid, target_uuid]:
+        stmt = select(Contact).where(Contact.id == contact_id)
+        result = await db.execute(stmt)
+        contact = result.scalar_one_or_none()
+        if not contact:
+            raise ContactNotFoundError(str(contact_id))
 
     # Check if edge already exists (in either direction)
-    existing = (
-        supabase.table("contact_associations")
-        .select("id")
-        .or_(
-            f"and(source_contact_id.eq.{source_id},target_contact_id.eq.{target_id}),"
-            f"and(source_contact_id.eq.{target_id},target_contact_id.eq.{source_id})"
+    stmt = select(ContactAssociation).where(
+        or_(
+            (ContactAssociation.source_contact_id == source_uuid)
+            & (ContactAssociation.target_contact_id == target_uuid),
+            (ContactAssociation.source_contact_id == target_uuid)
+            & (ContactAssociation.target_contact_id == source_uuid),
         )
-        .execute()
     )
+    result = await db.execute(stmt)
+    existing = result.scalar_one_or_none()
 
-    if existing.data:
+    if existing:
         raise GraphEdgeExistsError(source_id, target_id)
 
     # Create edge
-    result = (
-        supabase.table("contact_associations")
-        .insert(
-            {
-                "source_contact_id": source_id,
-                "target_contact_id": target_id,
-                "label": label,
-            }
-        )
-        .execute()
+    edge = ContactAssociation(
+        source_contact_id=source_uuid,
+        target_contact_id=target_uuid,
+        label=label,
     )
+    db.add(edge)
+    await db.flush()  # Flush to get the generated ID and created_at
+    await db.refresh(edge)  # Refresh to get server defaults
 
-    edge = result.data[0]
     return EdgeResponse(
-        id=edge["id"],
-        source_id=edge["source_contact_id"],
-        target_id=edge["target_contact_id"],
-        label=edge.get("label"),
-        created_at=edge["created_at"],
+        id=str(edge.id),
+        source_id=str(edge.source_contact_id),
+        target_id=str(edge.target_contact_id),
+        label=edge.label,
+        created_at=edge.created_at,
     )
 
 
-def delete_edge(supabase: Client, edge_id: str) -> None:
+async def delete_edge(db: AsyncSession, edge_id: str) -> None:
     """Delete an association.
 
     Args:
-        supabase: Supabase client instance.
+        db: Database session.
         edge_id: Edge ID to delete.
 
     Raises:
         GraphEdgeNotFoundError: If edge doesn't exist.
     """
+    # Convert string ID to UUID
+    try:
+        edge_uuid = uuid.UUID(edge_id)
+    except ValueError as e:
+        raise GraphEdgeNotFoundError(edge_id) from e
+
     # Check edge exists
-    existing = supabase.table("contact_associations").select("id").eq("id", edge_id).execute()
-    if not existing.data:
+    stmt = select(ContactAssociation).where(ContactAssociation.id == edge_uuid)
+    result = await db.execute(stmt)
+    edge = result.scalar_one_or_none()
+
+    if not edge:
         raise GraphEdgeNotFoundError(edge_id)
 
     # Delete edge
-    supabase.table("contact_associations").delete().eq("id", edge_id).execute()
+    await db.delete(edge)

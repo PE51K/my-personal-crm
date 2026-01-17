@@ -3,16 +3,22 @@
 from datetime import date
 
 from fastapi import APIRouter, File, Query, UploadFile, status
+from fastapi.responses import FileResponse
 
-from app.core.deps import CurrentOwner, SupabaseClient
-from app.core.errors import FileTooLargeError, FileTypeInvalidError, PhotoNotFoundError
+from app.api.dependencies import CurrentOwner, DBSession
+from app.utils.errors import PhotoNotFoundError
+from app.services.storage import (
+    delete_file,
+    file_exists,
+    get_file_url,
+    save_uploaded_file,
+)
 from app.schemas.contact import (
     ContactCreateRequest,
     ContactListResponse,
     ContactResponse,
     ContactUpdateRequest,
     PhotoUploadResponse,
-    PhotoUrlResponse,
 )
 from app.services.contacts import (
     create_contact,
@@ -21,13 +27,8 @@ from app.services.contacts import (
     list_contacts,
     update_contact,
 )
-from app.services.supabase import get_signed_photo_url, upload_photo
 
 router = APIRouter(prefix="/contacts", tags=["Contacts"])
-
-# Constants for file upload
-MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
-ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
 @router.post(
@@ -40,7 +41,7 @@ ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 async def create_contact_endpoint(
     request: ContactCreateRequest,
     current_user: CurrentOwner,
-    supabase: SupabaseClient,
+    db: DBSession,
 ) -> ContactResponse:
     """Create a new contact.
 
@@ -50,13 +51,13 @@ async def create_contact_endpoint(
     Args:
         request: Contact creation request.
         current_user: Current authenticated owner.
-        supabase: Supabase client instance.
+        db: Database session.
 
     Returns:
         Created contact with all related data.
     """
-    return create_contact(
-        supabase=supabase,
+    return await create_contact(
+        db=db,
         first_name=request.first_name,
         middle_name=request.middle_name,
         last_name=request.last_name,
@@ -81,7 +82,7 @@ async def create_contact_endpoint(
 )
 async def list_contacts_endpoint(
     current_user: CurrentOwner,
-    supabase: SupabaseClient,
+    db: DBSession,
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
     status_id: str | None = Query(default=None, description="Filter by status ID"),
@@ -109,7 +110,7 @@ async def list_contacts_endpoint(
 
     Args:
         current_user: Current authenticated owner.
-        supabase: Supabase client instance.
+        db: Database session.
         page: Page number (1-indexed).
         page_size: Number of items per page.
         status_id: Filter by status ID.
@@ -132,8 +133,8 @@ async def list_contacts_endpoint(
     parsed_interest_ids = interest_ids.split(",") if interest_ids else None
     parsed_occupation_ids = occupation_ids.split(",") if occupation_ids else None
 
-    return list_contacts(
-        supabase=supabase,
+    return await list_contacts(
+        db=db,
         page=page,
         page_size=page_size,
         status_id=status_id,
@@ -174,7 +175,7 @@ async def list_contacts_endpoint(
 async def get_contact_endpoint(
     contact_id: str,
     current_user: CurrentOwner,
-    supabase: SupabaseClient,
+    db: DBSession,
 ) -> ContactResponse:
     """Get a single contact by ID.
 
@@ -184,7 +185,7 @@ async def get_contact_endpoint(
     Args:
         contact_id: Contact ID to fetch.
         current_user: Current authenticated owner.
-        supabase: Supabase client instance.
+        db: Database session.
 
     Returns:
         Contact with all related data.
@@ -192,7 +193,7 @@ async def get_contact_endpoint(
     Raises:
         ContactNotFoundError: If contact doesn't exist.
     """
-    return get_contact(supabase, contact_id)
+    return await get_contact(db, contact_id)
 
 
 @router.patch(
@@ -210,7 +211,7 @@ async def update_contact_endpoint(
     contact_id: str,
     request: ContactUpdateRequest,
     current_user: CurrentOwner,
-    supabase: SupabaseClient,
+    db: DBSession,
 ) -> ContactResponse:
     """Update a contact (partial update).
 
@@ -222,7 +223,7 @@ async def update_contact_endpoint(
         contact_id: Contact ID to update.
         request: Contact update request.
         current_user: Current authenticated owner.
-        supabase: Supabase client instance.
+        db: Database session.
 
     Returns:
         Updated contact with all related data.
@@ -231,8 +232,8 @@ async def update_contact_endpoint(
         ContactNotFoundError: If contact doesn't exist.
         StatusNotFoundError: If status_id is invalid.
     """
-    return update_contact(
-        supabase=supabase,
+    return await update_contact(
+        db=db,
         contact_id=contact_id,
         first_name=request.first_name,
         middle_name=request.middle_name,

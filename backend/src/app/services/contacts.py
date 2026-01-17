@@ -1,13 +1,26 @@
-"""Contact business logic."""
+"""Contact business logic using SQLAlchemy."""
 
 import logging
 import math
 from datetime import date
 from typing import Any
+from uuid import UUID
 
-from supabase import Client
+from sqlalchemy import delete as sql_delete
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.core.errors import ContactNotFoundError, StatusNotFoundError
+from app.utils.errors import ContactNotFoundError, StatusNotFoundError
+from app.services.storage import get_file_url
+from app.models import (
+    Contact,
+    ContactAssociation,
+    Interest,
+    Occupation,
+    Status,
+    Tag,
+)
 from app.schemas.contact import (
     ContactAssociationBrief,
     ContactListItem,
@@ -22,7 +35,6 @@ from app.schemas.contact import (
     TagBase,
     TagInput,
 )
-from app.services.supabase import get_signed_photo_url
 
 logger = logging.getLogger(__name__)
 
@@ -32,16 +44,16 @@ def _is_temp_id(id_str: str) -> bool:
     return id_str.startswith("temp-")
 
 
-def _process_tags(
-    supabase: Client,
+async def _process_tags(
+    db: AsyncSession,
     tag_inputs: list[str | TagInput] | None,
-) -> list[str]:
-    """Process tag inputs and return list of valid tag IDs.
+) -> list[UUID]:
+    """Process tag inputs and return list of valid tag UUIDs.
 
     Creates new tags for temp IDs and returns real UUIDs.
 
     Args:
-        supabase: Supabase client instance.
+        db: Database session instance.
         tag_inputs: List of tag IDs or tag input objects.
 
     Returns:
@@ -57,31 +69,32 @@ def _process_tags(
             if _is_temp_id(tag_input):
                 logger.warning("Received temp tag ID without name: %s", tag_input)
                 continue
-            tag_ids.append(tag_input)
+            tag_ids.append(UUID(tag_input))
         else:
             # TagInput object
             if _is_temp_id(tag_input.id):
                 # Create new tag
-                result = supabase.table("tags").insert({"name": tag_input.name}).execute()
-                if result.data:
-                    tag_ids.append(result.data[0]["id"])
+                new_tag = Tag(name=tag_input.name)
+                db.add(new_tag)
+                await db.flush()
+                tag_ids.append(new_tag.id)
             else:
                 # Use existing tag ID
-                tag_ids.append(tag_input.id)
+                tag_ids.append(UUID(tag_input.id))
 
     return tag_ids
 
 
-def _process_interests(
-    supabase: Client,
+async def _process_interests(
+    db: AsyncSession,
     interest_inputs: list[str | InterestInput] | None,
-) -> list[str]:
-    """Process interest inputs and return list of valid interest IDs.
+) -> list[UUID]:
+    """Process interest inputs and return list of valid interest UUIDs.
 
     Creates new interests for temp IDs and returns real UUIDs.
 
     Args:
-        supabase: Supabase client instance.
+        db: Database session instance.
         interest_inputs: List of interest IDs or interest input objects.
 
     Returns:
@@ -97,31 +110,32 @@ def _process_interests(
             if _is_temp_id(interest_input):
                 logger.warning("Received temp interest ID without name: %s", interest_input)
                 continue
-            interest_ids.append(interest_input)
+            interest_ids.append(UUID(interest_input))
         else:
             # InterestInput object
             if _is_temp_id(interest_input.id):
                 # Create new interest
-                result = supabase.table("interests").insert({"name": interest_input.name}).execute()
-                if result.data:
-                    interest_ids.append(result.data[0]["id"])
+                new_interest = Interest(name=interest_input.name)
+                db.add(new_interest)
+                await db.flush()
+                interest_ids.append(new_interest.id)
             else:
                 # Use existing interest ID
-                interest_ids.append(interest_input.id)
+                interest_ids.append(UUID(interest_input.id))
 
     return interest_ids
 
 
-def _process_occupations(
-    supabase: Client,
+async def _process_occupations(
+    db: AsyncSession,
     occupation_inputs: list[str | OccupationInput] | None,
-) -> list[str]:
-    """Process occupation inputs and return list of valid occupation IDs.
+) -> list[UUID]:
+    """Process occupation inputs and return list of valid occupation UUIDs.
 
     Creates new occupations for temp IDs and returns real UUIDs.
 
     Args:
-        supabase: Supabase client instance.
+        db: Database session instance.
         occupation_inputs: List of occupation IDs or occupation input objects.
 
     Returns:
@@ -137,149 +151,144 @@ def _process_occupations(
             if _is_temp_id(occupation_input):
                 logger.warning("Received temp occupation ID without name: %s", occupation_input)
                 continue
-            occupation_ids.append(occupation_input)
+            occupation_ids.append(UUID(occupation_input))
         else:
             # OccupationInput object
             if _is_temp_id(occupation_input.id):
                 # Create new occupation
-                result = (
-                    supabase.table("occupations").insert({"name": occupation_input.name}).execute()
-                )
-                if result.data:
-                    occupation_ids.append(result.data[0]["id"])
+                new_occupation = Occupation(name=occupation_input.name)
+                db.add(new_occupation)
+                await db.flush()
+                occupation_ids.append(new_occupation.id)
             else:
                 # Use existing occupation ID
-                occupation_ids.append(occupation_input.id)
+                occupation_ids.append(UUID(occupation_input.id))
 
     return occupation_ids
 
 
-def _build_contact_response(
-    supabase: Client,
-    contact: dict[str, Any],
+async def _build_contact_response(
+    db: AsyncSession,
+    contact: Contact,
 ) -> ContactResponse:
-    """Build a full ContactResponse from raw contact data.
+    """Build a full ContactResponse from a Contact model.
 
     Args:
-        supabase: Supabase client for fetching related data.
-        contact: Raw contact data from database.
+        db: Database session instance.
+        contact: Contact model instance.
 
     Returns:
         Full ContactResponse with all related data.
     """
-    contact_id = contact["id"]
+    # Ensure all relationships are loaded
+    await db.refresh(
+        contact,
+        ["status", "tags", "interests", "occupations", "source_associations", "target_associations"]
+    )
 
-    # Fetch status
+    # Build status
     status = None
-    if contact.get("status_id"):
-        status_result = (
-            supabase.table("statuses").select("id, name").eq("id", contact["status_id"]).execute()
-        )
-        if status_result.data:
-            status = StatusBase(**status_result.data[0])
+    if contact.status:
+        status = StatusBase(id=str(contact.status.id), name=contact.status.name)
 
-    # Fetch tags
-    tags_result = (
-        supabase.table("contact_tags")
-        .select("tags(id, name)")
-        .eq("contact_id", contact_id)
-        .execute()
-    )
-    tags = [TagBase(**t["tags"]) for t in tags_result.data if t.get("tags")]
+    # Build tags
+    tags = [TagBase(id=str(tag.id), name=tag.name) for tag in contact.tags]
 
-    # Fetch interests
-    interests_result = (
-        supabase.table("contact_interests")
-        .select("interests(id, name)")
-        .eq("contact_id", contact_id)
-        .execute()
-    )
-    interests = [
-        InterestBase(**i["interests"]) for i in interests_result.data if i.get("interests")
-    ]
+    # Build interests
+    interests = [InterestBase(id=str(interest.id), name=interest.name) for interest in contact.interests]
 
-    # Fetch occupations
-    occupations_result = (
-        supabase.table("contact_occupations")
-        .select("occupations(id, name)")
-        .eq("contact_id", contact_id)
-        .execute()
-    )
-    occupations = [
-        OccupationBase(**o["occupations"]) for o in occupations_result.data if o.get("occupations")
-    ]
+    # Build occupations
+    occupations = [OccupationBase(id=str(occ.id), name=occ.name) for occ in contact.occupations]
 
-    # Fetch associations (contacts linked to this contact)
-    target_select = (
-        "target_contact_id, "
-        "contacts!contact_associations_target_contact_id_fkey(id, first_name, middle_name, last_name)"
-    )
-    associations_result = (
-        supabase.table("contact_associations")
-        .select(target_select)
-        .eq("source_contact_id", contact_id)
-        .execute()
-    )
-
-    # Also get reverse associations
-    source_select = (
-        "source_contact_id, "
-        "contacts!contact_associations_source_contact_id_fkey(id, first_name, middle_name, last_name)"
-    )
-    reverse_result = (
-        supabase.table("contact_associations")
-        .select(source_select)
-        .eq("target_contact_id", contact_id)
-        .execute()
-    )
-
+    # Build associations (load related contacts)
     associations = []
     seen_ids = set()
 
-    for a in associations_result.data:
-        if a.get("contacts") and a["contacts"]["id"] not in seen_ids:
-            associations.append(ContactAssociationBrief(**a["contacts"]))
-            seen_ids.add(a["contacts"]["id"])
+    for assoc in contact.source_associations:
+        await db.refresh(assoc, ["target_contact"])
+        target = assoc.target_contact
+        if target.id not in seen_ids:
+            associations.append(
+                ContactAssociationBrief(
+                    id=str(target.id),
+                    first_name=target.first_name,
+                    middle_name=target.middle_name,
+                    last_name=target.last_name,
+                )
+            )
+            seen_ids.add(target.id)
 
-    for a in reverse_result.data:
-        if a.get("contacts") and a["contacts"]["id"] not in seen_ids:
-            associations.append(ContactAssociationBrief(**a["contacts"]))
-            seen_ids.add(a["contacts"]["id"])
+    for assoc in contact.target_associations:
+        await db.refresh(assoc, ["source_contact"])
+        source = assoc.source_contact
+        if source.id not in seen_ids:
+            associations.append(
+                ContactAssociationBrief(
+                    id=str(source.id),
+                    first_name=source.first_name,
+                    middle_name=source.middle_name,
+                    last_name=source.last_name,
+                )
+            )
+            seen_ids.add(source.id)
 
     # Generate signed photo URL if photo exists
     photo_url = None
-    if contact.get("photo_path"):
+    if contact.photo_path:
         try:
-            photo_url, _ = get_signed_photo_url(supabase, contact["photo_path"])
+            photo_url = get_file_url(contact.photo_path)
         except Exception:
-            logger.warning("Failed to generate signed URL for photo: %s", contact["photo_path"])
+            logger.warning("Failed to generate signed URL for photo: %s", contact.photo_path)
 
     return ContactResponse(
-        id=contact["id"],
-        first_name=contact["first_name"],
-        middle_name=contact.get("middle_name"),
-        last_name=contact.get("last_name"),
-        telegram_username=contact.get("telegram_username"),
-        linkedin_url=contact.get("linkedin_url"),
-        github_username=contact.get("github_username"),
-        met_at=contact.get("met_at"),
-        status_id=contact.get("status_id"),
+        id=str(contact.id),
+        first_name=contact.first_name,
+        middle_name=contact.middle_name,
+        last_name=contact.last_name,
+        telegram_username=contact.telegram_username,
+        linkedin_url=contact.linkedin_url,
+        github_username=contact.github_username,
+        met_at=contact.met_at,
+        status_id=str(contact.status_id) if contact.status_id else None,
         status=status,
-        notes=contact.get("notes"),
-        photo_path=contact.get("photo_path"),
+        notes=contact.notes,
+        photo_path=contact.photo_path,
         photo_url=photo_url,
         tags=tags,
         interests=interests,
         occupations=occupations,
         associations=associations,
-        sort_order_in_status=contact.get("sort_order_in_status", 0),
-        created_at=contact["created_at"],
-        updated_at=contact["updated_at"],
+        sort_order_in_status=contact.sort_order_in_status,
+        created_at=contact.created_at,
+        updated_at=contact.updated_at,
+    )
+
+    return ContactResponse(
+        id=str(contact.id),
+        first_name=contact.first_name,
+        middle_name=contact.middle_name,
+        last_name=contact.last_name,
+        telegram_username=contact.telegram_username,
+        linkedin_url=contact.linkedin_url,
+        github_username=contact.github_username,
+        met_at=contact.met_at,
+        status_id=str(contact.status_id) if contact.status_id else None,
+        status=status,
+        notes=contact.notes,
+        photo_path=contact.photo_path,
+        photo_url=photo_url,
+        tags=tags,
+        interests=interests,
+        occupations=occupations,
+        associations=associations,
+        sort_order_in_status=contact.sort_order_in_status,
+        created_at=contact.created_at,
+        updated_at=contact.updated_at,
     )
 
 
-def create_contact(
-    supabase: Client,
+async def create_contact(
+    db: AsyncSession,
     first_name: str,
     middle_name: str | None = None,
     last_name: str | None = None,
@@ -297,7 +306,7 @@ def create_contact(
     """Create a new contact.
 
     Args:
-        supabase: Supabase client instance.
+        db: Database session instance.
         first_name: Contact's first name.
         middle_name: Contact's middle name.
         last_name: Contact's last name.
@@ -320,67 +329,69 @@ def create_contact(
     """
     # Validate status_id if provided
     if status_id:
-        status_result = supabase.table("statuses").select("id").eq("id", status_id).execute()
-        if not status_result.data:
+        result = await db.execute(select(Status).where(Status.id == UUID(status_id)))
+        if not result.scalar_one_or_none():
             raise StatusNotFoundError(status_id)
 
     # Process tag/interest/occupation inputs (create new ones if needed)
-    processed_tag_ids = _process_tags(supabase, tag_ids)
-    processed_interest_ids = _process_interests(supabase, interest_ids)
-    processed_occupation_ids = _process_occupations(supabase, occupation_ids)
+    processed_tag_ids = await _process_tags(db, tag_ids)
+    processed_interest_ids = await _process_interests(db, interest_ids)
+    processed_occupation_ids = await _process_occupations(db, occupation_ids)
 
     # Create contact
-    contact_data = {
-        "first_name": first_name,
-        "middle_name": middle_name,
-        "last_name": last_name,
-        "telegram_username": telegram_username,
-        "linkedin_url": str(linkedin_url) if linkedin_url else None,
-        "github_username": github_username,
-        "met_at": met_at.isoformat() if met_at else None,
-        "status_id": status_id,
-        "notes": notes,
-    }
+    contact = Contact(
+        first_name=first_name,
+        middle_name=middle_name,
+        last_name=last_name,
+        telegram_username=telegram_username,
+        linkedin_url=str(linkedin_url) if linkedin_url else None,
+        github_username=github_username,
+        met_at=met_at,
+        status_id=UUID(status_id) if status_id else None,
+        notes=notes,
+    )
+    db.add(contact)
+    await db.flush()
 
-    result = supabase.table("contacts").insert(contact_data).execute()
-    contact = result.data[0]
-    contact_id = contact["id"]
-
-    # Create or link tags
+    # Load and associate tags
     if processed_tag_ids:
-        tag_links = [{"contact_id": contact_id, "tag_id": tid} for tid in processed_tag_ids]
-        supabase.table("contact_tags").insert(tag_links).execute()
+        result = await db.execute(select(Tag).where(Tag.id.in_(processed_tag_ids)))
+        tags = result.scalars().all()
+        contact.tags.extend(tags)
 
-    # Create or link interests
+    # Load and associate interests
     if processed_interest_ids:
-        interest_links = [
-            {"contact_id": contact_id, "interest_id": iid} for iid in processed_interest_ids
-        ]
-        supabase.table("contact_interests").insert(interest_links).execute()
+        result = await db.execute(select(Interest).where(Interest.id.in_(processed_interest_ids)))
+        interests = result.scalars().all()
+        contact.interests.extend(interests)
 
-    # Create or link occupations
+    # Load and associate occupations
     if processed_occupation_ids:
-        occupation_links = [
-            {"contact_id": contact_id, "occupation_id": oid} for oid in processed_occupation_ids
-        ]
-        supabase.table("contact_occupations").insert(occupation_links).execute()
+        result = await db.execute(select(Occupation).where(Occupation.id.in_(processed_occupation_ids)))
+        occupations = result.scalars().all()
+        contact.occupations.extend(occupations)
 
     # Create associations
     if association_contact_ids:
-        association_links = [
-            {"source_contact_id": contact_id, "target_contact_id": aid}
-            for aid in association_contact_ids
-        ]
-        supabase.table("contact_associations").insert(association_links).execute()
+        for target_id in association_contact_ids:
+            association = ContactAssociation(
+                source_contact_id=contact.id,
+                target_contact_id=UUID(target_id),
+            )
+            db.add(association)
 
-    return _build_contact_response(supabase, contact)
+    await db.flush()
+    return await _build_contact_response(db, contact)
 
 
-def get_contact(supabase: Client, contact_id: str) -> ContactResponse:
+async def get_contact(
+    db: AsyncSession,
+    contact_id: str,
+) -> ContactResponse:
     """Get a single contact by ID.
 
     Args:
-        supabase: Supabase client instance.
+        db: Database session instance.
         contact_id: Contact ID to fetch.
 
     Returns:
@@ -389,16 +400,28 @@ def get_contact(supabase: Client, contact_id: str) -> ContactResponse:
     Raises:
         ContactNotFoundError: If contact doesn't exist.
     """
-    result = supabase.table("contacts").select("*").eq("id", contact_id).execute()
+    result = await db.execute(
+        select(Contact)
+        .where(Contact.id == UUID(contact_id))
+        .options(
+            selectinload(Contact.status),
+            selectinload(Contact.tags),
+            selectinload(Contact.interests),
+            selectinload(Contact.occupations),
+            selectinload(Contact.source_associations).selectinload(ContactAssociation.target_contact),
+            selectinload(Contact.target_associations).selectinload(ContactAssociation.source_contact),
+        )
+    )
+    contact = result.scalar_one_or_none()
 
-    if not result.data:
+    if not contact:
         raise ContactNotFoundError(contact_id)
 
-    return _build_contact_response(supabase, result.data[0])
+    return await _build_contact_response(db, contact)
 
 
-def list_contacts(
-    supabase: Client,
+async def list_contacts(
+    db: AsyncSession,
     page: int = 1,
     page_size: int = 20,
     status_id: str | None = None,
@@ -416,7 +439,7 @@ def list_contacts(
     """List contacts with filtering and pagination.
 
     Args:
-        supabase: Supabase client instance.
+        db: Database session instance.
         page: Page number (1-indexed).
         page_size: Number of items per page.
         status_id: Filter by status ID.
@@ -435,47 +458,52 @@ def list_contacts(
         Paginated list of contacts.
     """
     # Build base query
-    query = supabase.table("contacts").select("*", count="exact")
+    query = select(Contact)
 
     # Apply filters
     if status_id:
-        query = query.eq("status_id", status_id)
+        query = query.where(Contact.status_id == UUID(status_id))
 
     if created_at_from:
-        query = query.gte("created_at", created_at_from.isoformat())
+        query = query.where(Contact.created_at >= created_at_from)
 
     if created_at_to:
-        query = query.lte("created_at", created_at_to.isoformat())
+        query = query.where(Contact.created_at <= created_at_to)
 
     if met_at_from:
-        query = query.gte("met_at", met_at_from.isoformat())
+        query = query.where(Contact.met_at >= met_at_from)
 
     if met_at_to:
-        query = query.lte("met_at", met_at_to.isoformat())
+        query = query.where(Contact.met_at <= met_at_to)
 
     # Track search words for post-filtering if multi-word search
     search_words: list[str] = []
     if search:
-        # Search in first_name, last_name, middle_name
         # Split search into words to support full name search like "John Smith"
         search_words = search.strip().lower().split()
-        # Build OR conditions for all words - this gets contacts matching ANY word
-        # We'll filter for ALL words in post-processing for multi-word searches
+        # Build OR conditions for all words
         or_conditions = []
         for word in search_words:
-            or_conditions.append(f"first_name.ilike.%{word}%")
-            or_conditions.append(f"last_name.ilike.%{word}%")
-            or_conditions.append(f"middle_name.ilike.%{word}%")
-        query = query.or_(",".join(or_conditions))
+            pattern = f"%{word}%"
+            or_conditions.extend([
+                Contact.first_name.ilike(pattern),
+                Contact.last_name.ilike(pattern),
+                Contact.middle_name.ilike(pattern),
+            ])
+        query = query.where(or_(*or_conditions))
 
     # Get contact IDs filtered by tags/interests/occupations
-    contact_ids_to_filter: set[str] | None = None
+    contact_ids_to_filter: set[UUID] | None = None
 
     if tag_ids:
-        tag_result = (
-            supabase.table("contact_tags").select("contact_id").in_("tag_id", tag_ids).execute()
+        tag_uuid_ids = [UUID(tid) for tid in tag_ids]
+        tag_result = await db.execute(
+            select(Contact.id)
+            .join(Contact.tags)
+            .where(Tag.id.in_(tag_uuid_ids))
+            .group_by(Contact.id)
         )
-        tag_contact_ids = {r["contact_id"] for r in tag_result.data}
+        tag_contact_ids = {row[0] for row in tag_result}
         contact_ids_to_filter = (
             tag_contact_ids
             if contact_ids_to_filter is None
@@ -483,13 +511,14 @@ def list_contacts(
         )
 
     if interest_ids:
-        interest_result = (
-            supabase.table("contact_interests")
-            .select("contact_id")
-            .in_("interest_id", interest_ids)
-            .execute()
+        interest_uuid_ids = [UUID(iid) for iid in interest_ids]
+        interest_result = await db.execute(
+            select(Contact.id)
+            .join(Contact.interests)
+            .where(Interest.id.in_(interest_uuid_ids))
+            .group_by(Contact.id)
         )
-        interest_contact_ids = {r["contact_id"] for r in interest_result.data}
+        interest_contact_ids = {row[0] for row in interest_result}
         contact_ids_to_filter = (
             interest_contact_ids
             if contact_ids_to_filter is None
@@ -497,13 +526,14 @@ def list_contacts(
         )
 
     if occupation_ids:
-        occupation_result = (
-            supabase.table("contact_occupations")
-            .select("contact_id")
-            .in_("occupation_id", occupation_ids)
-            .execute()
+        occupation_uuid_ids = [UUID(oid) for oid in occupation_ids]
+        occupation_result = await db.execute(
+            select(Contact.id)
+            .join(Contact.occupations)
+            .where(Occupation.id.in_(occupation_uuid_ids))
+            .group_by(Contact.id)
         )
-        occupation_contact_ids = {r["contact_id"] for r in occupation_result.data}
+        occupation_contact_ids = {row[0] for row in occupation_result}
         contact_ids_to_filter = (
             occupation_contact_ids
             if contact_ids_to_filter is None
@@ -522,74 +552,77 @@ def list_contacts(
                     total_pages=0,
                 ),
             )
-        query = query.in_("id", list(contact_ids_to_filter))
+        query = query.where(Contact.id.in_(contact_ids_to_filter))
+
+    # Get total count before pagination
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total_items = total_result.scalar_one()
 
     # Apply sorting
-    query = query.order(sort_by, desc=(sort_order == "desc"))
+    sort_column = getattr(Contact, sort_by, Contact.created_at)
+    if sort_order == "desc":
+        query = query.order_by(sort_column.desc())
+    else:
+        query = query.order_by(sort_column.asc())
 
     # Apply pagination
     offset = (page - 1) * page_size
-    query = query.range(offset, offset + page_size - 1)
+    query = query.offset(offset).limit(page_size)
+
+    # Load relationships
+    query = query.options(
+        selectinload(Contact.status),
+        selectinload(Contact.tags),
+    )
 
     # Execute query
-    result = query.execute()
+    result = await db.execute(query)
+    contacts = result.scalars().all()
 
     # Build response items
     items = []
-    for contact in result.data:
+    for contact in contacts:
         # Post-filter for multi-word search - all words must match at least one name field
         if len(search_words) > 1:
             full_name_parts = [
-                (contact.get("first_name") or "").lower(),
-                (contact.get("middle_name") or "").lower(),
-                (contact.get("last_name") or "").lower(),
+                (contact.first_name or "").lower(),
+                (contact.middle_name or "").lower(),
+                (contact.last_name or "").lower(),
             ]
             full_name = " ".join(full_name_parts)
             if not all(word in full_name for word in search_words):
                 continue
-        # Fetch status
-        status = None
-        if contact.get("status_id"):
-            status_result = (
-                supabase.table("statuses")
-                .select("id, name")
-                .eq("id", contact["status_id"])
-                .execute()
-            )
-            if status_result.data:
-                status = StatusBase(**status_result.data[0])
 
-        # Fetch tags
-        tags_result = (
-            supabase.table("contact_tags")
-            .select("tags(id, name)")
-            .eq("contact_id", contact["id"])
-            .execute()
-        )
-        tags = [TagBase(**t["tags"]) for t in tags_result.data if t.get("tags")]
+        # Build status
+        status = None
+        if contact.status:
+            status = StatusBase(id=str(contact.status.id), name=contact.status.name)
+
+        # Build tags
+        tags = [TagBase(id=str(tag.id), name=tag.name) for tag in contact.tags]
 
         # Generate signed photo URL if photo exists
         photo_url = None
-        if contact.get("photo_path"):
+        if contact.photo_path:
             try:
-                photo_url, _ = get_signed_photo_url(supabase, contact["photo_path"])
+                photo_url = get_file_url(contact.photo_path)
             except Exception:
                 logger.warning("Failed to generate signed URL for photo")
 
         items.append(
             ContactListItem(
-                id=contact["id"],
-                first_name=contact["first_name"],
-                middle_name=contact.get("middle_name"),
-                last_name=contact.get("last_name"),
+                id=str(contact.id),
+                first_name=contact.first_name,
+                middle_name=contact.middle_name,
+                last_name=contact.last_name,
                 status=status,
                 photo_url=photo_url,
                 tags=tags,
-                created_at=contact["created_at"],
+                created_at=contact.created_at,
             )
         )
 
-    total_items = result.count or 0
     total_pages = math.ceil(total_items / page_size) if total_items > 0 else 0
 
     return ContactListResponse(
@@ -603,8 +636,8 @@ def list_contacts(
     )
 
 
-def update_contact(
-    supabase: Client,
+async def update_contact(
+    db: AsyncSession,
     contact_id: str,
     first_name: str | None = None,
     middle_name: str | None = None,
@@ -623,7 +656,7 @@ def update_contact(
     """Update a contact.
 
     Args:
-        supabase: Supabase client instance.
+        db: Database session instance.
         contact_id: Contact ID to update.
         first_name: Contact's first name.
         middle_name: Contact's middle name.
@@ -646,105 +679,117 @@ def update_contact(
         ContactNotFoundError: If contact doesn't exist.
         StatusNotFoundError: If status_id is invalid.
     """
-    # Check contact exists
-    existing = supabase.table("contacts").select("id").eq("id", contact_id).execute()
-    if not existing.data:
+    # Check contact exists and load it
+    result = await db.execute(
+        select(Contact)
+        .where(Contact.id == UUID(contact_id))
+        .options(
+            selectinload(Contact.tags),
+            selectinload(Contact.interests),
+            selectinload(Contact.occupations),
+        )
+    )
+    contact = result.scalar_one_or_none()
+    if not contact:
         raise ContactNotFoundError(contact_id)
 
     # Validate status_id if provided
     if status_id:
-        status_result = supabase.table("statuses").select("id").eq("id", status_id).execute()
-        if not status_result.data:
+        status_result = await db.execute(select(Status).where(Status.id == UUID(status_id)))
+        if not status_result.scalar_one_or_none():
             raise StatusNotFoundError(status_id)
 
-    # Build update data (only include non-None values)
-    update_data: dict[str, Any] = {}
+    # Update basic fields (only if non-None)
     if first_name is not None:
-        update_data["first_name"] = first_name
+        contact.first_name = first_name
     if middle_name is not None:
-        update_data["middle_name"] = middle_name
+        contact.middle_name = middle_name
     if last_name is not None:
-        update_data["last_name"] = last_name
+        contact.last_name = last_name
     if telegram_username is not None:
-        update_data["telegram_username"] = telegram_username
+        contact.telegram_username = telegram_username
     if linkedin_url is not None:
-        update_data["linkedin_url"] = str(linkedin_url)
+        contact.linkedin_url = str(linkedin_url)
     if github_username is not None:
-        update_data["github_username"] = github_username
+        contact.github_username = github_username
     if met_at is not None:
-        update_data["met_at"] = met_at.isoformat()
+        contact.met_at = met_at
     if status_id is not None:
-        update_data["status_id"] = status_id
+        contact.status_id = UUID(status_id)
     if notes is not None:
-        update_data["notes"] = notes
-
-    # Update contact if there's data to update
-    if update_data:
-        supabase.table("contacts").update(update_data).eq("id", contact_id).execute()
+        contact.notes = notes
 
     # Update tags if provided
     if tag_ids is not None:
         # Process tag inputs (create new ones if needed)
-        processed_tag_ids = _process_tags(supabase, tag_ids)
-        # Delete existing tags
-        supabase.table("contact_tags").delete().eq("contact_id", contact_id).execute()
-        # Insert new tags
+        processed_tag_ids = await _process_tags(db, tag_ids)
+        # Clear existing tags
+        contact.tags.clear()
+        # Load and add new tags
         if processed_tag_ids:
-            tag_links = [{"contact_id": contact_id, "tag_id": tid} for tid in processed_tag_ids]
-            supabase.table("contact_tags").insert(tag_links).execute()
+            tag_result = await db.execute(select(Tag).where(Tag.id.in_(processed_tag_ids)))
+            tags = tag_result.scalars().all()
+            contact.tags.extend(tags)
 
     # Update interests if provided
     if interest_ids is not None:
         # Process interest inputs (create new ones if needed)
-        processed_interest_ids = _process_interests(supabase, interest_ids)
-        supabase.table("contact_interests").delete().eq("contact_id", contact_id).execute()
+        processed_interest_ids = await _process_interests(db, interest_ids)
+        # Clear existing interests
+        contact.interests.clear()
+        # Load and add new interests
         if processed_interest_ids:
-            interest_links = [
-                {"contact_id": contact_id, "interest_id": iid} for iid in processed_interest_ids
-            ]
-            supabase.table("contact_interests").insert(interest_links).execute()
+            interest_result = await db.execute(select(Interest).where(Interest.id.in_(processed_interest_ids)))
+            interests = interest_result.scalars().all()
+            contact.interests.extend(interests)
 
     # Update occupations if provided
     if occupation_ids is not None:
         # Process occupation inputs (create new ones if needed)
-        processed_occupation_ids = _process_occupations(supabase, occupation_ids)
-        supabase.table("contact_occupations").delete().eq("contact_id", contact_id).execute()
+        processed_occupation_ids = await _process_occupations(db, occupation_ids)
+        # Clear existing occupations
+        contact.occupations.clear()
+        # Load and add new occupations
         if processed_occupation_ids:
-            occupation_links = [
-                {"contact_id": contact_id, "occupation_id": oid} for oid in processed_occupation_ids
-            ]
-            supabase.table("contact_occupations").insert(occupation_links).execute()
+            occupation_result = await db.execute(select(Occupation).where(Occupation.id.in_(processed_occupation_ids)))
+            occupations = occupation_result.scalars().all()
+            contact.occupations.extend(occupations)
 
     # Update associations if provided
     if association_contact_ids is not None:
         # Delete existing associations where this contact is the source
-        supabase.table("contact_associations").delete().eq(
-            "source_contact_id", contact_id
-        ).execute()
+        await db.execute(
+            sql_delete(ContactAssociation).where(ContactAssociation.source_contact_id == contact.id)
+        )
+        # Create new associations
         if association_contact_ids:
-            association_links = [
-                {"source_contact_id": contact_id, "target_contact_id": aid}
-                for aid in association_contact_ids
-            ]
-            supabase.table("contact_associations").insert(association_links).execute()
+            for target_id in association_contact_ids:
+                association = ContactAssociation(
+                    source_contact_id=contact.id,
+                    target_contact_id=UUID(target_id),
+                )
+                db.add(association)
 
-    return get_contact(supabase, contact_id)
+    await db.flush()
+    return await get_contact(db, contact_id)
 
 
-def delete_contact(supabase: Client, contact_id: str) -> None:
+async def delete_contact(db: AsyncSession, contact_id: str) -> None:
     """Delete a contact.
 
     Args:
-        supabase: Supabase client instance.
+        db: Database session instance.
         contact_id: Contact ID to delete.
 
     Raises:
         ContactNotFoundError: If contact doesn't exist.
     """
     # Check contact exists
-    existing = supabase.table("contacts").select("id").eq("id", contact_id).execute()
-    if not existing.data:
+    result = await db.execute(select(Contact).where(Contact.id == UUID(contact_id)))
+    contact = result.scalar_one_or_none()
+    if not contact:
         raise ContactNotFoundError(contact_id)
 
     # Delete contact (cascades to related tables)
-    supabase.table("contacts").delete().eq("id", contact_id).execute()
+    await db.delete(contact)
+    await db.flush()

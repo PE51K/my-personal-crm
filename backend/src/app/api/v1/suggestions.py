@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Query
 
-from app.core.deps import CurrentOwner, SupabaseClient
+from app.api.dependencies import CurrentOwner, DBSession
 from app.schemas.suggestion import SuggestionItem, SuggestionListResponse
 
 router = APIRouter(prefix="/suggestions", tags=["Suggestions"])
