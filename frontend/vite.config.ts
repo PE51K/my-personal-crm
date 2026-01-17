@@ -9,6 +9,10 @@ export default defineConfig({
       '@': new URL('./src', import.meta.url).pathname,
     },
   },
+  define: {
+    // Polyfill for libraries that expect Node.js global object
+    global: 'globalThis',
+  },
   server: {
     port: 5173,
     proxy: {
