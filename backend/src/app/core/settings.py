@@ -43,10 +43,10 @@ class AppCORSSettings(BaseSettings):
         extra="ignore",
     )
 
-    origins: list[str]
-    allow_credentials: bool
-    allow_methods: list[str]
-    allow_headers: list[str]
+    origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+    allow_credentials: bool = True
+    allow_methods: list[str] = ["*"]
+    allow_headers: list[str] = ["*"]
 
 
 class AppSettings(BaseSettings):
@@ -108,8 +108,8 @@ class DatabaseSettings(BaseSettings):
     host: str = "localhost"
     port: int = 5432
     db: str = "personal_crm"
-    user: str
-    password: str
+    user: str = "crm_user"
+    password: str = "crm_password"
 
     @property
     def url(self) -> str:
@@ -150,10 +150,10 @@ class S3Settings(BaseSettings):
         extra="ignore",
     )
 
-    endpoint_url: str
-    access_key_id: str
-    secret_access_key: str
-    bucket_name: str
+    endpoint_url: str = "http://minio:9000"
+    access_key_id: str = "minioadmin"
+    secret_access_key: str = "minioadmin"
+    bucket_name: str = "contact-photos"
     region: str = "us-east-1"
 
 
@@ -178,11 +178,11 @@ class YandexGPTSettings(BaseSettings):
         extra="ignore",
     )
 
-    api_key: str
-    base_url: str
-    folder_id: str
-    model: str
-    model_version: str
+    api_key: str = ""
+    base_url: str = "https://llm.api.cloud.yandex.net"
+    folder_id: str = ""
+    model: str = "yandexgpt"
+    model_version: str = "latest"
 
     @property
     def model_name(self) -> str:
