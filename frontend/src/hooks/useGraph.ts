@@ -10,6 +10,7 @@ import {
 } from '@/services/graph';
 import type {
   EdgeCreateRequest,
+  ContactListParams,
 } from '@/types';
 import { contactKeys } from './useContacts';
 
@@ -24,7 +25,7 @@ export const graphKeys = {
 /**
  * Hook to fetch full graph data with optional filters
  */
-export function useGraph(filters?: Partial<import('@/types').ContactListParams>) {
+export function useGraph(filters?: Partial<ContactListParams>) {
   return useQuery({
     queryKey: [...graphKeys.data(), filters],
     queryFn: () => getGraph(filters),

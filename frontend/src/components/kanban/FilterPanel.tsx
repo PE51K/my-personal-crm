@@ -14,7 +14,7 @@ import {
   usePositionSuggestions,
   useStatusSuggestions,
 } from '@/hooks/useSuggestions';
-import type { ContactListParams, Tag, Interest, Occupation, Position, Status } from '@/types';
+import type { ContactListParams, Tag, Interest, Position, Status } from '@/types';
 
 interface FilterPanelProps {
   filters: ContactListParams;
@@ -57,7 +57,7 @@ export function FilterPanel({
 
   const selectedOccupations = useMemo(() => {
     const occupationIds = filters.occupation_ids ?? [];
-    return (occupationSuggestions?.data ?? []).filter((occupation) => occupationIds.includes(occupation.id)) as Occupation[];
+    return (occupationSuggestions?.data ?? []).filter((occupation) => occupationIds.includes(occupation.id));
   }, [filters.occupation_ids, occupationSuggestions?.data]);
 
   const selectedPositions = useMemo(() => {
@@ -67,7 +67,7 @@ export function FilterPanel({
 
   const selectedStatuses = useMemo(() => {
     const statusIds = filters.status_ids ?? [];
-    return (statusSuggestions ?? []).filter((status) => statusIds.includes(status.id)) as Status[];
+    return statusSuggestions.filter((status) => statusIds.includes(status.id));
   }, [filters.status_ids, statusSuggestions]);
 
   const handleTagSelect = useCallback(
@@ -81,7 +81,13 @@ export function FilterPanel({
   const handleTagRemove = useCallback(
     (item: Tag) => {
       const newTagIds = (filters.tag_ids ?? []).filter((id) => id !== item.id);
-      onFiltersChange({ ...filters, tag_ids: newTagIds.length > 0 ? newTagIds : undefined });
+      const newFilters = { ...filters };
+      if (newTagIds.length > 0) {
+        newFilters.tag_ids = newTagIds;
+      } else {
+        delete newFilters.tag_ids;
+      }
+      onFiltersChange(newFilters);
     },
     [filters, onFiltersChange]
   );
@@ -97,13 +103,19 @@ export function FilterPanel({
   const handleInterestRemove = useCallback(
     (item: Interest) => {
       const newInterestIds = (filters.interest_ids ?? []).filter((id) => id !== item.id);
-      onFiltersChange({ ...filters, interest_ids: newInterestIds.length > 0 ? newInterestIds : undefined });
+      const newFilters = { ...filters };
+      if (newInterestIds.length > 0) {
+        newFilters.interest_ids = newInterestIds;
+      } else {
+        delete newFilters.interest_ids;
+      }
+      onFiltersChange(newFilters);
     },
     [filters, onFiltersChange]
   );
 
   const handleOccupationSelect = useCallback(
-    (item: Occupation) => {
+    (item: { id: string; name: string }) => {
       const newOccupationIds = [...(filters.occupation_ids ?? []), item.id];
       onFiltersChange({ ...filters, occupation_ids: newOccupationIds });
     },
@@ -111,9 +123,15 @@ export function FilterPanel({
   );
 
   const handleOccupationRemove = useCallback(
-    (item: Occupation) => {
+    (item: { id: string; name: string }) => {
       const newOccupationIds = (filters.occupation_ids ?? []).filter((id) => id !== item.id);
-      onFiltersChange({ ...filters, occupation_ids: newOccupationIds.length > 0 ? newOccupationIds : undefined });
+      const newFilters = { ...filters };
+      if (newOccupationIds.length > 0) {
+        newFilters.occupation_ids = newOccupationIds;
+      } else {
+        delete newFilters.occupation_ids;
+      }
+      onFiltersChange(newFilters);
     },
     [filters, onFiltersChange]
   );
@@ -129,7 +147,13 @@ export function FilterPanel({
   const handlePositionRemove = useCallback(
     (item: Position) => {
       const newPositionIds = (filters.position_ids ?? []).filter((id) => id !== item.id);
-      onFiltersChange({ ...filters, position_ids: newPositionIds.length > 0 ? newPositionIds : undefined });
+      const newFilters = { ...filters };
+      if (newPositionIds.length > 0) {
+        newFilters.position_ids = newPositionIds;
+      } else {
+        delete newFilters.position_ids;
+      }
+      onFiltersChange(newFilters);
     },
     [filters, onFiltersChange]
   );
@@ -145,7 +169,13 @@ export function FilterPanel({
   const handleStatusRemove = useCallback(
     (item: Status) => {
       const newStatusIds = (filters.status_ids ?? []).filter((id) => id !== item.id);
-      onFiltersChange({ ...filters, status_ids: newStatusIds.length > 0 ? newStatusIds : undefined });
+      const newFilters = { ...filters };
+      if (newStatusIds.length > 0) {
+        newFilters.status_ids = newStatusIds;
+      } else {
+        delete newFilters.status_ids;
+      }
+      onFiltersChange(newFilters);
     },
     [filters, onFiltersChange]
   );
@@ -211,7 +241,7 @@ export function FilterPanel({
             placeholder="Filter by status..."
             query={statusQuery}
             onQueryChange={setStatusQuery}
-            suggestions={statusSuggestions ?? []}
+            suggestions={statusSuggestions}
             selectedItems={selectedStatuses}
             onSelect={handleStatusSelect}
             onRemove={handleStatusRemove}

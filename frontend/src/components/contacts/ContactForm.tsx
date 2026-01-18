@@ -98,7 +98,7 @@ export function ContactForm({
     if (initialData?.occupations) {
       return initialData.occupations.map((occ) => ({
         occupation: occ,
-        positions: occ.positions || [],
+        positions: occ.positions,
       }));
     }
     return [];
@@ -156,17 +156,13 @@ export function ContactForm({
       });
       setSelectedTags(initialData.tags);
       setSelectedInterests(initialData.interests);
-      // Group positions by occupation
-      if (initialData.occupations && initialData.positions) {
-        setOccupationsWithPositions(
-          initialData.occupations.map((occ) => ({
-            occupation: occ,
-            positions: initialData.positions.filter(
-              (pos) => pos.occupation_id === occ.id
-            ),
-          }))
-        );
-      }
+      // Group positions by occupation - positions are already nested in occupations
+      setOccupationsWithPositions(
+        initialData.occupations.map((occ) => ({
+          occupation: occ,
+          positions: occ.positions,
+        }))
+      );
       setSelectedStatus(initialData.status);
       setSelectedAssociations(initialData.associations);
     }
@@ -226,7 +222,7 @@ export function ContactForm({
         // Send full objects (with id and name) to support temp IDs
         tag_ids: selectedTags.map((t) => ({ id: t.id, name: t.name })),
         interest_ids: selectedInterests.map((i) => ({ id: i.id, name: i.name })),
-        occupations: occupations.length > 0 ? occupations : undefined,
+        ...(occupations.length > 0 && { occupations }),
         association_contact_ids: selectedAssociations.map((a) => a.id),
       };
 
@@ -516,7 +512,9 @@ export function ContactForm({
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleRemoveOccupation(occupation.id)}
+                  onClick={() => {
+                    handleRemoveOccupation(occupation.id);
+                  }}
                   className="text-red-600 hover:text-red-800 text-sm font-medium"
                 >
                   Remove
@@ -532,7 +530,9 @@ export function ContactForm({
                         key={position.id}
                         variant="primary"
                         removable
-                        onRemove={() => handleRemovePosition(occupation.id, position.id)}
+                        onRemove={() => {
+                          handleRemovePosition(occupation.id, position.id);
+                        }}
                       >
                         {position.name}
                       </Badge>
@@ -565,7 +565,9 @@ export function ContactForm({
                     }));
                   }}
                   onRemove={() => {}}
-                  onCreate={(name) => handleCreatePosition(occupation.id, name)}
+                  onCreate={(name) => {
+                    handleCreatePosition(occupation.id, name);
+                  }}
                   isLoading={loadingPositions}
                 />
               </div>

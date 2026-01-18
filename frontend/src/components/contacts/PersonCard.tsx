@@ -288,7 +288,7 @@ export function PersonCard({
                 <h3 className="text-sm font-semibold text-gray-900 mb-2">Occupations & Positions</h3>
                 <div className="space-y-3">
                   {contact.occupations.map((occupation) => {
-                    const positions = occupation.positions || [];
+                    const positions = occupation.positions;
                     return (
                       <div
                         key={occupation.id}

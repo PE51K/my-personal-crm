@@ -136,11 +136,11 @@ export function GraphView({
     });
     return uniqueEdges.map((edge) => {
       const isPending = edge.id.startsWith('pending-');
-      const edgeConfig: Record<string, unknown> = {
+      const edgeConfig = {
         id: edge.id,
         from: edge.source_id,
         to: edge.target_id,
-        smooth: false,
+        smooth: false as const,
         color: {
           color: isPending ? '#FCD34D' : '#9CA3AF',
           highlight: '#818CF8',
@@ -155,8 +155,8 @@ export function GraphView({
           background: '#374151',
           strokeWidth: 0,
         },
+        ...(edge.label && { label: edge.label }),
       };
-      if (edge.label) edgeConfig.label = edge.label;
       return edgeConfig;
     });
   }, [data?.edges, pendingChanges]);
@@ -450,30 +450,36 @@ export function GraphView({
   }, [network, data?.nodes]);
 
   // Event handlers
-  const events = {
-    select: (event: { nodes: (string | number)[] }) => {
-      const { nodes } = event;
+  const events: {
+    select?: (params?: unknown) => void;
+    doubleClick?: (params?: unknown) => void;
+  } = {
+    select: (event?: unknown) => {
+      if (!event || typeof event !== 'object' || !('nodes' in event)) return;
+      const { nodes } = event as { nodes: (string | number)[] };
 
       if (edgeCreationMode && nodes.length > 0) {
         const clickedNodeId = nodes[0];
+        if (clickedNodeId === undefined) return;
 
         if (!connectingNodeId) {
           // First click - start connection
-          setConnectingNodeId(clickedNodeId);
-        } else if (connectingNodeId !== clickedNodeId) {
+          setConnectingNodeId(String(clickedNodeId));
+        } else if (connectingNodeId !== String(clickedNodeId)) {
           // Second click - check if connection exists
           // Check both actual edges and pending changes
+          const clickedNodeIdStr = String(clickedNodeId);
           const existingEdge = data?.edges.find(
             (edge) =>
-              (edge.source_id === connectingNodeId && edge.target_id === clickedNodeId) ||
-              (edge.source_id === clickedNodeId && edge.target_id === connectingNodeId)
+              (edge.source_id === connectingNodeId && edge.target_id === clickedNodeIdStr) ||
+              (edge.source_id === clickedNodeIdStr && edge.target_id === connectingNodeId)
           );
 
           const pendingEdge = pendingChanges.find(
             (c): c is PendingEdgeAdd =>
               c.type === 'add' &&
-              ((c.sourceId === connectingNodeId && c.targetId === clickedNodeId) ||
-                (c.sourceId === clickedNodeId && c.targetId === connectingNodeId))
+              ((c.sourceId === connectingNodeId && c.targetId === clickedNodeIdStr) ||
+                (c.sourceId === clickedNodeIdStr && c.targetId === connectingNodeId))
           );
 
           const isPendingDelete = pendingChanges.some(
@@ -488,7 +494,7 @@ export function GraphView({
             handlePendingEdgeDelete(pendingEdge.tempId);
           } else {
             // No connection - create new edge (pending)
-            handlePendingEdgeCreate(connectingNodeId, clickedNodeId);
+            handlePendingEdgeCreate(connectingNodeId, clickedNodeIdStr);
           }
 
           setConnectingNodeId(null);
@@ -504,19 +510,22 @@ export function GraphView({
         }
       }
     },
-    doubleClick: (event: { edges: (string | number)[] }) => {
-      if (event.edges.length > 0) {
+    doubleClick: (event?: unknown) => {
+      if (!event || typeof event !== 'object' || !('edges' in event)) return;
+      const { edges } = event as { edges: (string | number)[] };
+      if (edges.length > 0) {
         // Double-click edge to delete (works in both modes now)
-        handlePendingEdgeDelete(String(event.edges[0]));
+        handlePendingEdgeDelete(String(edges[0]));
       }
     },
   };
 
   // Get network instance
-  const getNetwork = useCallback((networkInstance: NetworkInstance | null) => {
-    if (networkInstance && !network) {
-      setNetwork(networkInstance);
-      networkRef.current = networkInstance;
+  const getNetwork = useCallback((networkInstance: unknown) => {
+    const network = networkInstance as NetworkInstance | null;
+    if (network && !networkRef.current) {
+      setNetwork(network);
+      networkRef.current = network;
 
       // Only set up stabilization callback if we don't already have positions
       if (!isStabilized || Object.keys(nodePositions.current).length === 0) {
@@ -524,8 +533,8 @@ export function GraphView({
         // (we used to disable physics here, but it was then re-enabled when options
         // changed on mode toggle—react-graph-vis does setOptions(nextProps.options).
         // Leaving physics on avoids the "works only after toggling mode" behavior.)
-        networkInstance.once('stabilizationIterationsDone', () => {
-          networkInstance.fit({
+        network.once('stabilizationIterationsDone', () => {
+          network.fit({
             animation: {
               duration: 500,
               easingFunction: 'easeInOutQuad',
@@ -535,7 +544,7 @@ export function GraphView({
           setTimeout(() => {
             if (data?.nodes) {
               data.nodes.forEach((node) => {
-                const position = networkInstance.getPositions([node.id])[node.id];
+                const position = network.getPositions([node.id])[node.id];
                 if (position) {
                   nodePositions.current[node.id] = position;
                 }
@@ -547,7 +556,7 @@ export function GraphView({
       } else {
         // Already have positions (remount), fit the view
         setTimeout(() => {
-          networkInstance.fit({
+          network.fit({
             animation: {
               duration: 500,
               easingFunction: 'easeInOutQuad',
@@ -556,7 +565,7 @@ export function GraphView({
         }, 100);
       }
     }
-  }, [network, isStabilized, data?.nodes]);
+  }, [isStabilized, data?.nodes]);
 
   // Update node colors when mode or connecting state changes
   useEffect(() => {
@@ -727,7 +736,7 @@ export function GraphView({
 
       {/* Graph */}
       <Graph
-        key={`${graphKey}-${graphEdges.map((e) => String(e.id)).sort().join(',')}`}
+        key={`${graphKey}-${graphEdges.map((e) => e.id).sort().join(',')}`}
         graph={graphData}
         options={options}
         events={events}
