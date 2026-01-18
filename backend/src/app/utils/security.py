@@ -150,12 +150,13 @@ def verify_jwt_token(token: str, expected_type: str = "access") -> TokenPayload:
     # Validate required claims
     sub = payload.get("sub")
     if not sub:
-        raise jwt.JWTError("Token missing 'sub' claim")
+        raise jwt.JWTError("Missing 'sub' claim")  # noqa: TRY003
 
     # Validate token type
     token_type = payload.get("type", "access")
     if token_type != expected_type:
-        raise jwt.JWTError(f"Invalid token type. Expected {expected_type}, got {token_type}")
+        msg = f"Invalid token type. Expected {expected_type}, got {token_type}"
+        raise jwt.JWTError(msg)
 
     return TokenPayload(
         sub=sub,

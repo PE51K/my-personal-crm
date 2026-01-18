@@ -29,8 +29,12 @@ async def get_graph_endpoint(
     current_user: CurrentOwner,
     db: DBSession,
     status_id: str | None = Query(default=None, description="Filter by status ID (single)"),
-    status_ids: str | None = Query(default=None, description="Filter by status IDs (comma-separated, any match)"),
-    tag_ids: str | None = Query(default=None, description="Filter by tag IDs (comma-separated, any match)"),
+    status_ids: str | None = Query(
+        default=None, description="Filter by status IDs (comma-separated, any match)"
+    ),
+    tag_ids: str | None = Query(
+        default=None, description="Filter by tag IDs (comma-separated, any match)"
+    ),
     interest_ids: str | None = Query(
         default=None, description="Filter by interest IDs (comma-separated, any match)"
     ),

@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Text, func
+from sqlalchemy import Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -86,6 +86,5 @@ class Position(Base):
 
     # Relationships
     contact_occupations: Mapped[list["ContactOccupation"]] = relationship(
-        secondary="contact_occupation_positions",
-        back_populates="positions"
+        secondary="contact_occupation_positions", back_populates="positions"
     )

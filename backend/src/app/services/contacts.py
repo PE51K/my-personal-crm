@@ -150,7 +150,7 @@ async def _process_occupations(
 
     occupation_ids = []
     temp_id_mapping: dict[str, UUID] = {}
-    
+
     for occupation_input in occupation_inputs:
         if isinstance(occupation_input, str):
             # String ID - check if temp or real
@@ -178,8 +178,9 @@ async def _process_occupations_with_positions(
     db: AsyncSession,
     occupations_input: list[OccupationWithPositionsInput] | None,
 ) -> list[tuple[UUID, list[UUID]]]:
-    """Process occupations with their positions and return list of (occupation_id, position_ids) tuples.
+    """Process occupations with positions.
 
+    Returns list of (occupation_id, position_ids) tuples.
     Creates new occupations and positions for temp IDs and returns real UUIDs.
 
     Args:
@@ -193,7 +194,7 @@ async def _process_occupations_with_positions(
         return []
 
     result = []
-    
+
     for occ_input in occupations_input:
         # Process occupation
         occupation_id: UUID
@@ -205,12 +206,12 @@ async def _process_occupations_with_positions(
             occupation_id = new_occupation.id
         else:
             occupation_id = UUID(occ_input.id)
-        
+
         # Process positions for this occupation
         position_ids = await _process_positions(db, occ_input.position_ids, None)
-        
+
         result.append((occupation_id, position_ids))
-    
+
     return result
 
 
@@ -238,7 +239,7 @@ async def _process_positions(
     position_ids = []
     # Track positions we've already processed in this batch to avoid duplicates
     processed_positions_cache: dict[str, UUID] = {}
-    
+
     for position_input in position_inputs:
         if isinstance(position_input, str):
             # String ID - check if temp or real
@@ -253,13 +254,13 @@ async def _process_positions(
                 # Use position we already processed in this batch
                 position_ids.append(processed_positions_cache[position_input.name])
                 continue
-            
+
             # Check if position with same name already exists in DB
             existing_position_result = await db.execute(
                 select(Position).where(Position.name == position_input.name)
             )
             existing_position = existing_position_result.scalar_one_or_none()
-            
+
             if existing_position:
                 # Use existing position from DB
                 position_ids.append(existing_position.id)
@@ -317,9 +318,7 @@ async def _process_status(
         # Get max sort_order to place new status at the end
         result = await db.execute(select(func.max(Status.sort_order)))
         max_sort_order = result.scalar() or 0
-        new_status = Status(
-            name=status_input.name, sort_order=max_sort_order + 1, is_active=True
-        )
+        new_status = Status(name=status_input.name, sort_order=max_sort_order + 1, is_active=True)
         db.add(new_status)
         await db.flush()
         return new_status.id
@@ -364,14 +363,13 @@ async def _build_contact_response(
     for contact_occ in contact.contact_occupations:
         # Get all positions for this contact-occupation relationship
         occ_positions = [
-            PositionBase(id=str(pos.id), name=pos.name)
-            for pos in contact_occ.positions
+            PositionBase(id=str(pos.id), name=pos.name) for pos in contact_occ.positions
         ]
         occupations.append(
             OccupationBase(
                 id=str(contact_occ.occupation.id),
                 name=contact_occ.occupation.name,
-                positions=occ_positions
+                positions=occ_positions,
             )
         )
 
@@ -498,11 +496,12 @@ async def create_contact(
     )
     db.add(contact)
     await db.flush()
-    
+
     # Re-query contact with all relationships loaded to avoid lazy loading issues
-    contact_stmt = select(Contact).where(Contact.id == contact.id).options(
-        selectinload(Contact.tags),
-        selectinload(Contact.interests)
+    contact_stmt = (
+        select(Contact)
+        .where(Contact.id == contact.id)
+        .options(selectinload(Contact.tags), selectinload(Contact.interests))
     )
     contact_result = await db.execute(contact_stmt)
     contact = contact_result.scalar_one()
@@ -524,23 +523,20 @@ async def create_contact(
         occupations_data = await _process_occupations_with_positions(db, occupations)
         for occupation_id, position_ids in occupations_data:
             # Create ContactOccupation
-            contact_occ = ContactOccupation(
-                contact_id=contact.id,
-                occupation_id=occupation_id
-            )
+            contact_occ = ContactOccupation(contact_id=contact.id, occupation_id=occupation_id)
             db.add(contact_occ)
             await db.flush()
-            
+
             # Link positions to this ContactOccupation
             if position_ids:
-                result = await db.execute(
-                    select(Position).where(Position.id.in_(position_ids))
-                )
+                result = await db.execute(select(Position).where(Position.id.in_(position_ids)))
                 positions = result.scalars().all()
                 # Re-query with relationships loaded to avoid lazy loading
-                co_stmt = select(ContactOccupation).where(
-                    ContactOccupation.id == contact_occ.id
-                ).options(selectinload(ContactOccupation.positions))
+                co_stmt = (
+                    select(ContactOccupation)
+                    .where(ContactOccupation.id == contact_occ.id)
+                    .options(selectinload(ContactOccupation.positions))
+                )
                 co_result = await db.execute(co_stmt)
                 contact_occ_loaded = co_result.scalar_one()
                 contact_occ_loaded.positions = positions
@@ -955,23 +951,20 @@ async def update_contact(
         occupations_data = await _process_occupations_with_positions(db, occupations)
         for occupation_id, position_ids in occupations_data:
             # Create ContactOccupation
-            contact_occ = ContactOccupation(
-                contact_id=contact.id,
-                occupation_id=occupation_id
-            )
+            contact_occ = ContactOccupation(contact_id=contact.id, occupation_id=occupation_id)
             db.add(contact_occ)
             await db.flush()
-            
+
             # Link positions to this ContactOccupation
             if position_ids:
-                result = await db.execute(
-                    select(Position).where(Position.id.in_(position_ids))
-                )
+                result = await db.execute(select(Position).where(Position.id.in_(position_ids)))
                 positions = result.scalars().all()
                 # Re-query with relationships loaded to avoid lazy loading
-                co_stmt = select(ContactOccupation).where(
-                    ContactOccupation.id == contact_occ.id
-                ).options(selectinload(ContactOccupation.positions))
+                co_stmt = (
+                    select(ContactOccupation)
+                    .where(ContactOccupation.id == contact_occ.id)
+                    .options(selectinload(ContactOccupation.positions))
+                )
                 co_result = await db.execute(co_stmt)
                 contact_occ_loaded = co_result.scalar_one()
                 contact_occ_loaded.positions = positions

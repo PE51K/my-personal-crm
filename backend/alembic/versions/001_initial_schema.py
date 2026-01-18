@@ -226,7 +226,8 @@ def upgrade() -> None:
     op.create_index("idx_contact_occupations_contact", "contact_occupations", ["contact_id"])
     op.create_index("idx_contact_occupations_occupation", "contact_occupations", ["occupation_id"])
 
-    # Create contact_occupation_positions table (links positions to contact-occupation relationships)
+    # Create contact_occupation_positions table
+    # (links positions to contact-occupation relationships)
     op.create_table(
         "contact_occupation_positions",
         sa.Column("contact_occupation_id", postgresql.UUID(as_uuid=True), nullable=False),

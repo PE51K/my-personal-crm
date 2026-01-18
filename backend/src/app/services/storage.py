@@ -68,7 +68,7 @@ def ensure_bucket_exists() -> None:
         if not client.bucket_exists(bucket_name):
             client.make_bucket(bucket_name)
     except S3Error as e:
-        raise InternalError(f"Failed to ensure bucket exists: {e}") from e
+        raise InternalError(f"Bucket creation failed: {e}") from e  # noqa: TRY003
 
 
 def validate_file_size(file: UploadFile) -> None:
@@ -174,9 +174,9 @@ async def save_uploaded_file(file: UploadFile, filename: str | None = None) -> s
             content_type=file.content_type or "application/octet-stream",
         )
     except S3Error as e:
-        raise InternalError(f"Failed to save file: {e}") from e
+        raise InternalError(f"File save failed: {e}") from e  # noqa: TRY003
     except Exception as e:
-        raise InternalError(f"Failed to save file: {e}") from e
+        raise InternalError(f"File save failed: {e}") from e  # noqa: TRY003
     finally:
         await file.close()
 
@@ -200,9 +200,9 @@ def delete_file(file_path: str) -> None:
         # Delete file from MinIO
         client.remove_object(bucket_name, file_path)
     except S3Error as e:
-        raise InternalError(f"Failed to delete file: {e}") from e
+        raise InternalError(f"File delete failed: {e}") from e  # noqa: TRY003
     except Exception as e:
-        raise InternalError(f"Failed to delete file: {e}") from e
+        raise InternalError(f"File delete failed: {e}") from e  # noqa: TRY003
 
 
 def get_file_url(object_name: str, expires_seconds: int = 3600) -> str:
@@ -233,7 +233,7 @@ def get_file_url(object_name: str, expires_seconds: int = 3600) -> str:
     except S3Error as e:
         raise PhotoNotFoundError from e
     except Exception as e:
-        raise InternalError(f"Failed to generate file URL: {e}") from e
+        raise InternalError(f"URL generation failed: {e}") from e  # noqa: TRY003
 
 
 def file_exists(object_name: str) -> bool:
@@ -290,4 +290,4 @@ def get_file_stream(object_name: str) -> BinaryIO:
     except S3Error as e:
         raise PhotoNotFoundError from e
     except Exception as e:
-        raise InternalError(f"Failed to retrieve file: {e}") from e
+        raise InternalError(f"File retrieval failed: {e}") from e  # noqa: TRY003

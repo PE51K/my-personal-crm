@@ -86,8 +86,12 @@ async def list_contacts_endpoint(
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
     status_id: str | None = Query(default=None, description="Filter by status ID (single)"),
-    status_ids: str | None = Query(default=None, description="Filter by status IDs (comma-separated, any match)"),
-    tag_ids: str | None = Query(default=None, description="Filter by tag IDs (comma-separated, any match)"),
+    status_ids: str | None = Query(
+        default=None, description="Filter by status IDs (comma-separated, any match)"
+    ),
+    tag_ids: str | None = Query(
+        default=None, description="Filter by tag IDs (comma-separated, any match)"
+    ),
     interest_ids: str | None = Query(
         default=None, description="Filter by interest IDs (comma-separated, any match)"
     ),

@@ -8,6 +8,15 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core.settings import Settings
 
+# Import alembic only when needed (migrations container only)
+# These imports are conditional to avoid requiring alembic in all environments
+try:
+    from alembic import command
+    from alembic.config import Config
+except ImportError:
+    command = None  # type: ignore[assignment]
+    Config = None  # type: ignore[assignment, misc]
+
 logger = logging.getLogger(__name__)
 
 
@@ -17,9 +26,8 @@ def run_alembic_migrations() -> None:
     Raises:
         RuntimeError: If migrations fail to apply.
     """
-    # Import alembic only when needed (migrations container only)
-    from alembic import command
-    from alembic.config import Config
+    if command is None or Config is None:
+        raise RuntimeError("Alembic not installed")  # noqa: TRY003
 
     logger.info("============================================")
     logger.info("Running database migrations")
@@ -30,7 +38,7 @@ def run_alembic_migrations() -> None:
 
     if not alembic_ini_path.exists():
         logger.error("Alembic configuration not found at %s", alembic_ini_path)
-        raise RuntimeError("Alembic configuration file not found")
+        raise RuntimeError("Config file not found")  # noqa: TRY003
 
     try:
         # Create Alembic config
@@ -43,7 +51,7 @@ def run_alembic_migrations() -> None:
 
     except Exception as e:
         logger.exception("✗ Migration failed")
-        raise RuntimeError(f"Alembic migration failed: {e}") from e
+        raise RuntimeError(f"Migration failed: {e}") from e  # noqa: TRY003
 
 
 def setup_storage_directory(settings: Settings) -> None:
@@ -140,7 +148,7 @@ async def initialize_app(settings: Settings) -> None:
         logger.info("")
 
     except Exception:
-        logger.error("============================================")
+        logger.exception("============================================")
         logger.exception("✗ Initialization failed")
-        logger.error("============================================")
+        logger.exception("============================================")
         raise

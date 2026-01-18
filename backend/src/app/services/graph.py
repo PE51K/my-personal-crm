@@ -8,7 +8,14 @@ from uuid import UUID
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Contact, ContactAssociation, ContactOccupation, Interest, Occupation, Position, Tag
+from app.models import (
+    Contact,
+    ContactAssociation,
+    ContactOccupation,
+    Interest,
+    Position,
+    Tag,
+)
 from app.schemas.graph import (
     EdgeResponse,
     GraphEdge,

@@ -13,7 +13,7 @@ from app.models.tables import contact_interests, contact_tags
 
 if TYPE_CHECKING:
     from app.models.association import ContactAssociation, ContactOccupation
-    from app.models.lookup import Interest, Occupation, Position, Tag
+    from app.models.lookup import Interest, Tag
     from app.models.status import Status
 
 
@@ -62,10 +62,7 @@ class Contact(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
     # updated_at is managed by PostgreSQL trigger (see migrations)
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(),
-        nullable=False
-    )
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
     # Relationships
     status: Mapped["Status | None"] = relationship(back_populates="contacts")

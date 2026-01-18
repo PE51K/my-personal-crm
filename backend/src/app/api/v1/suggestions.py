@@ -210,7 +210,9 @@ async def get_position_suggestions(
             Position.name,
             func.count(contact_occupation_positions.c.position_id).label("usage_count"),
         )
-        .outerjoin(contact_occupation_positions, Position.id == contact_occupation_positions.c.position_id)
+        .outerjoin(
+            contact_occupation_positions, Position.id == contact_occupation_positions.c.position_id
+        )
         .where(Position.name.ilike(f"%{q}%"))
         .group_by(Position.id, Position.name)
         .order_by(func.count(contact_occupation_positions.c.position_id).desc())

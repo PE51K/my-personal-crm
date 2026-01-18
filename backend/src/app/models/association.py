@@ -76,6 +76,5 @@ class ContactOccupation(Base):
     contact: Mapped["Contact"] = relationship(back_populates="contact_occupations")
     occupation: Mapped["Occupation"] = relationship(back_populates="contact_occupations")
     positions: Mapped[list["Position"]] = relationship(
-        secondary="contact_occupation_positions",
-        back_populates="contact_occupations"
+        secondary="contact_occupation_positions", back_populates="contact_occupations"
     )

@@ -22,9 +22,7 @@ class Status(Base):
     """
 
     __tablename__ = "statuses"
-    __table_args__ = (
-        Index("idx_statuses_is_active", "is_active"),
-    )
+    __table_args__ = (Index("idx_statuses_is_active", "is_active"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
@@ -33,6 +31,4 @@ class Status(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
     # Relationships
-    contacts: Mapped[list["Contact"]] = relationship(
-        back_populates="status"
-    )
+    contacts: Mapped[list["Contact"]] = relationship(back_populates="status")
