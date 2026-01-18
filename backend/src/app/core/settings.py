@@ -150,7 +150,7 @@ class S3Settings(BaseSettings):
         extra="ignore",
     )
 
-    endpoint_url: str = "http://minio:9000"
+    endpoint_url: str = "http://localhost:9000"
     access_key_id: str = "minioadmin"
     secret_access_key: str = "minioadmin"
     bucket_name: str = "contact-photos"

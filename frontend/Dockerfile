@@ -38,14 +38,14 @@ RUN npm run build
 # -----------------------------------------------------------------------------
 FROM nginx:1.27-alpine AS runtime
 
-# Install curl for healthcheck
-RUN apk add --no-cache curl
+# Install curl for healthcheck and envsubst for environment variable substitution
+RUN apk add --no-cache curl gettext
 
 # Remove default nginx static assets
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copy custom nginx configuration
-COPY nginx/default.conf /etc/nginx/conf.d/default.conf
+# Copy custom nginx configuration template
+COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
@@ -53,8 +53,13 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Set proper ownership (nginx runs as nginx user)
 RUN chown -R nginx:nginx /usr/share/nginx/html
 
-# Expose port 80
-EXPOSE 80
+# Nginx will automatically process .template files in /etc/nginx/templates/
+# and substitute environment variables using envsubst
+# Default port is set here, can be overridden via docker-compose environment
+ENV FRONTEND_PORT=3000
 
-# Use nginx's default CMD
+# Expose the default port (actual port is set by FRONTEND_PORT env var)
+EXPOSE 3000
+
+# Use nginx's default CMD (it will process templates automatically)
 CMD ["nginx", "-g", "daemon off;"]

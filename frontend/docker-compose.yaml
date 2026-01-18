@@ -15,22 +15,13 @@ services:
         # Pass Vite environment variables at build time
         - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
     container_name: personal-crm-web
-    ports:
-      - "${FRONTEND_PORT:-3000}:80"
-    depends_on:
-      api:
-        condition: service_healthy
+    network_mode: host
+    environment:
+      - FRONTEND_PORT=${FRONTEND_PORT:-3000}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      test: ["CMD", "curl", "-f", "http://localhost:${FRONTEND_PORT:-3000}/"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
     restart: unless-stopped
-    networks:
-      - crm-network
-
-networks:
-  crm-network:
-    name: personal-crm-network
-    external: false

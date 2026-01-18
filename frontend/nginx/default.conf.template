@@ -7,8 +7,8 @@
 # =============================================================================
 
 server {
-    listen 80;
-    listen [::]:80;
+    listen $FRONTEND_PORT;
+    listen [::]:$FRONTEND_PORT;
     server_name localhost;
 
     # Root directory for static files
@@ -21,8 +21,8 @@ server {
     # Proxy all /api requests to the backend service.
     # The backend API routes already include /api prefix, so we pass it through.
     location /api/ {
-        # Proxy to backend service (uses Docker network DNS)
-        proxy_pass http://api:8000;
+        # Proxy to backend service (uses localhost)
+        proxy_pass http://localhost:8000;
 
         # Pass original headers
         proxy_set_header Host $host;

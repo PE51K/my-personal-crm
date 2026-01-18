@@ -64,14 +64,14 @@ The API will be available at http://localhost:8000
 Copy `.env.example` to `.env` and configure:
 
 **Database (PostgreSQL):**
-- `POSTGRES_HOST` - Database host (use `localhost` for local dev, `db` for Docker)
+- `POSTGRES_HOST` - Database host (use `localhost` for both local dev and Docker)
 - `POSTGRES_PORT` - Database port (default: 5432)
 - `POSTGRES_DB` - Database name
 - `POSTGRES_USER` - Database user
 - `POSTGRES_PASSWORD` - Database password
 
 **Storage (MinIO/S3):**
-- `S3_ENDPOINT_URL` - MinIO endpoint (use `http://localhost:9000` for local dev)
+- `S3_ENDPOINT_URL` - MinIO endpoint (use `http://localhost:9000` for both local dev and Docker)
 - `S3_ACCESS_KEY_ID` - MinIO access key
 - `S3_SECRET_ACCESS_KEY` - MinIO secret key
 - `S3_BUCKET_NAME` - Bucket name for contact photos
