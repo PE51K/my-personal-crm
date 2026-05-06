@@ -75,8 +75,8 @@ my-personal-crm/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/PE51K/my-personal-crm
-   cd my-personal-crm
+   git clone https://github.com/PE51K/personal-crm
+   cd personal-crm
    ```
 
 2. **Configure environment variables**
